@@ -2,6 +2,15 @@
 
 using namespace std;
 
+
+default_random_engine rand_gen(time(0));
+normal_distribution<double> std_normal(0, 1);
+uniform_real_distribution<double> uniform_01(0, 1);
+uniform_int_distribution<int> uniform_rand_sample(0, N_CONCURRENT_SAMPLES - 1);
+
+
+
+
 //-------------- LIKELIHOOD RELATED THINGS ----------------//
 
 double single_gaussian_loglike_from_sample(double* p) {
@@ -59,7 +68,7 @@ double* gen_prior() {
 }
 
 bool is_elem_in_prior_range(double elem) {
-    return (elem > -5 && elem < 5);
+    return (elem > -50 && elem < 50);
 }
 
 bool is_in_prior_range(double* sample) {

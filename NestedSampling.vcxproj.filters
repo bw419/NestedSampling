@@ -21,10 +21,10 @@
     <ClCompile Include="MCMC.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GlobalDeclarations.cpp">
+    <ClCompile Include="Distributions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Distributions.cpp">
+    <ClCompile Include="Globals.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

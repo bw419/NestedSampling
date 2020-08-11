@@ -140,7 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Distributions.cpp" />
-    <ClCompile Include="GlobalDeclarations.cpp" />
+    <ClCompile Include="Globals.cpp" />
     <ClCompile Include="MCMC.cpp" />
     <ClCompile Include="NestedSampling.cpp" />
   </ItemGroup>

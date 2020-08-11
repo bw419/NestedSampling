@@ -2,11 +2,6 @@
 
 using namespace std;
 
-default_random_engine rand_gen(time(0));
-normal_distribution<double> std_normal(0, 1);
-uniform_real_distribution<double> uniform_01(0, 1);
-uniform_int_distribution<int> uniform_rand_sample(0, N_CONCURRENT_SAMPLES - 1);
-
 
 
 void overwrite_sample(double* old_sample, double* new_sample) {

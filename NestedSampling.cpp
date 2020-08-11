@@ -18,15 +18,38 @@ cmplx* sample_data::data_cmplx() {
 }
 
 
+vector<double> draw_weight_set(size_t n_samples) {
+    vector<double> weight_set{};
+
+    double X_i = 1.;
+    double X_prev;
+
+    for (int i = 0; i < n_samples - N_CONCURRENT_SAMPLES; ++i) {
+        X_prev = X_i;
+        X_i *= pow(uniform_01(rand_gen), 1./N_CONCURRENT_SAMPLES);
+        weight_set.push_back(X_prev - X_i);
+    }
+
+    double w_remaining = 0;//X_i / N_CONCURRENT_SAMPLES;
+    for (int i = n_samples - N_CONCURRENT_SAMPLES; i < n_samples; ++i) {
+        weight_set.push_back(w_remaining);
+    }
+    //weight_set.insert(weight_set.end(), N_CONCURRENT_SAMPLES, w_remaining);
+
+    return weight_set;
+}
+
+
 
 double current_samples[N_SAMPLE_CMPTS * N_CONCURRENT_SAMPLES]{};
 double curr_sample_loglikes[N_CONCURRENT_SAMPLES]{};
 vector<sample_data> out_samples;
 
+
 int main() {
 
     // loop entire program, ii=filename number
-    for (int ii = 15; ii < 25; ++ii) {
+    for (int file_number = 0; file_number < 10; ++file_number) {
 
         // generate initial points
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
@@ -38,7 +61,7 @@ int main() {
         double Z = 0;
         double X_prev_est = 1;
         double X_curr_est, w_est;
-        BallWalkMCMC mcmc = BallWalkMCMC(.5, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.01, 100);//0.01, 100);
+        BallWalkMCMC mcmc = BallWalkMCMC(.5, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.001, 10);//0.01, 100);
 
 
         for (int i = 1; i <= N_ITERATIONS; ++i) {
@@ -50,10 +73,10 @@ int main() {
             //cout << "rate, " << mcmc.acceptance_rate() << " | step size, " << mcmc.step_size() << endl;
             //cout << "---------------------------------------------" << endl;
 
-            if (!(i % 100)) {
+            if (!(i % 500)) {
                 //cout << endl;
-                //cout << "iteration " << i << ", success rate: "  << mcmc.acceptance_rate() << ", step size: " << mcmc.step_size() << endl;
-                //cout << "logz: " << log(Z) << endl;
+                cout << "\riteration " << i << ", success rate: "  << mcmc.acceptance_rate() << ", step size: " << mcmc.step_size() << ", logz: " << log(Z) << "            ";
+                //cout << endl;
             }
 
             auto min_L_it = min_element(curr_sample_loglikes, curr_sample_loglikes + N_CONCURRENT_SAMPLES);
@@ -63,10 +86,11 @@ int main() {
             w_est = X_prev_est - X_curr_est;
             Z += exp(*min_L_it) * w_est;
 
+            auto max_L_it = max_element(curr_sample_loglikes, curr_sample_loglikes + N_CONCURRENT_SAMPLES);
             out_samples.push_back(
                 sample_data(
                     current_samples + min_L_idx,
-                    *min_L_it, log(w_est),
+                    *min_L_it, *max_L_it, log(w_est),
                     mcmc.step_size(), mcmc.acceptance_rate(),
                     mcmc.acceptance_rate_deriv()
                 )
@@ -98,20 +122,28 @@ int main() {
             //cout << "~~~" << endl;
 
             if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
-
-                cout << "Terminated. " << exp(*min_L_it) << ", " << X_curr_est << ", " << Z << endl;
+                cout << "\rTerminated (evidence accumulation percentage), Z: " << Z;
                 break;
             }
+            if (mcmc.step_size() < TERMINATION_STEPSIZE) {
+                cout << "\rTerminated (step size), Z: " << Z;
+                break;
+            }
+            if (i == N_ITERATIONS - 1) {
+                cout << "\rTerminated (max iterations), Z: " << Z;
+            }
         }
+        
 
-        cout << endl << "------------------------" << endl;
+        cout << endl << "-----------------------------------" << endl;
 
         w_est = (exp(-(double)N_ITERATIONS / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
+
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
             out_samples.push_back(
                 sample_data(
                     current_samples + i * N_SAMPLE_CMPTS,
-                    curr_sample_loglikes[i], log(w_est),
+                    curr_sample_loglikes[i], curr_sample_loglikes[i], log(w_est),
                     mcmc.step_size(), mcmc.acceptance_rate(),
                     mcmc.acceptance_rate_deriv()
                 )
@@ -119,18 +151,55 @@ int main() {
             Z += exp(curr_sample_loglikes[i]) * w_est;
         }
 
+
+
+        double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES] {};
+
+        double acc_drawn_logZ = 0;
+        for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
+            double drawn_Z = 0;
+            vector<double> drawn_weight_set = draw_weight_set(out_samples.size());
+
+
+            for (int j = 0; j < out_samples.size(); ++j) {
+                drawn_Z += exp(out_samples[j].logl) * drawn_weight_set[j];
+            }
+
+            alternative_logZ_vals[i] = log(drawn_Z);
+            acc_drawn_logZ += alternative_logZ_vals[i];
+        }
+
+        double drawn_logZ_mean = acc_drawn_logZ / N_ALTERNATIVE_WEIGHT_SAMPLES;
+        double drawn_logZ_variance = 0;
+        double max_abs_delta = 0;
+        for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
+            double delta = alternative_logZ_vals[i] - drawn_logZ_mean;
+
+            if (abs(delta) > max_abs_delta) {
+                max_abs_delta = abs(delta);
+            }
+
+            drawn_logZ_variance += delta * delta;
+        }
+        drawn_logZ_variance /= (N_ALTERNATIVE_WEIGHT_SAMPLES-1);
+        double drawn_logZ_std_dev = sqrt(drawn_logZ_variance);
+
+
+
         cout << "Z: " << Z << endl;
-        cout << "logz: " << log(Z) << endl;
+        cout << "logz: " << log(Z) << " +- " << max_abs_delta << endl;
+        cout << "-----------------------------------" << endl;
+
 
         //cout << endl << "------------------------" << endl;
 
         ofstream outfile;
-        outfile.open(OUT_PATH + to_string(ii) + ".txt");
+        outfile.open(OUT_PATH + to_string(file_number) + ".txt");
 
         for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
             outfile << "cmpt_" << i << ",";
         }
-        outfile << "logl,logv,weight,stepsize,acceptrate,acceptrate_deriv" << endl;
+        outfile << "logl,logl2,logv,weight,stepsize,acceptrate,acceptrate_deriv" << endl;
 
         outfile << scientific << setprecision(16);
 
@@ -142,7 +211,8 @@ int main() {
             for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
                 outfile << sample_data.data_real()[i] << ",";
             }
-            outfile << sample_data.logl << "," << sample_data.logv << "," << sample_data.weight
+            outfile << sample_data.logl << "," << sample_data.logl2 
+             << "," << sample_data.logv << "," << sample_data.weight
              << "," << sample_data.stepsize << "," << sample_data.acceptrate
              << "," << sample_data.acceptrate_deriv << endl;
         }
