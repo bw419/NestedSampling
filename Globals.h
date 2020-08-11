@@ -17,7 +17,7 @@ using namespace std;
 #define OUT_PATH "out/samples"
 
 #define N_CONCURRENT_SAMPLES 500//30
-#define N_X_CMPTS 1
+#define N_X_CMPTS 5
 #define N_SAMPLE_CMPTS 2*N_X_CMPTS
 #define N_STEPS_PER_SAMPLE 50
 #define N_ITERATIONS 100000
@@ -40,3 +40,5 @@ extern uniform_int_distribution<int> uniform_rand_sample;
 
 void overwrite_sample(double* old_sample, double* new_sample);
 void print_vec(double* p, string name);
+void normalise_vec(double* p, int length);
+double get_vec_norm(double* p, int length);

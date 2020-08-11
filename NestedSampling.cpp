@@ -24,9 +24,12 @@ vector<double> draw_weight_set(size_t n_samples) {
     double X_i = 1.;
     double X_prev;
 
+    double total = 0;
+
     for (int i = 0; i < n_samples - N_CONCURRENT_SAMPLES; ++i) {
         X_prev = X_i;
         X_i *= pow(uniform_01(rand_gen), 1./N_CONCURRENT_SAMPLES);
+        total += pow(uniform_01(rand_gen), 1. / N_CONCURRENT_SAMPLES);
         weight_set.push_back(X_prev - X_i);
     }
 
@@ -80,17 +83,16 @@ int main() {
             }
 
             auto min_L_it = min_element(curr_sample_loglikes, curr_sample_loglikes + N_CONCURRENT_SAMPLES);
-            int min_L_idx = N_SAMPLE_CMPTS * (min_L_it - curr_sample_loglikes);
+            int min_L_idx = (min_L_it - curr_sample_loglikes);
 
             X_curr_est = exp(-(double)i / N_CONCURRENT_SAMPLES);
             w_est = X_prev_est - X_curr_est;
             Z += exp(*min_L_it) * w_est;
 
-            auto max_L_it = max_element(curr_sample_loglikes, curr_sample_loglikes + N_CONCURRENT_SAMPLES);
             out_samples.push_back(
                 sample_data(
-                    current_samples + min_L_idx,
-                    *min_L_it, *max_L_it, log(w_est),
+                    current_samples + min_L_idx * N_SAMPLE_CMPTS,
+                    *min_L_it, log(w_est),
                     mcmc.step_size(), mcmc.acceptance_rate(),
                     mcmc.acceptance_rate_deriv()
                 )
@@ -99,17 +101,8 @@ int main() {
             int start_pt_idx = uniform_rand_sample(rand_gen);
             //cout << "before... " << start_pt_idx << " , " << (current_samples + start_pt_idx * N_SAMPLE_CMPTS)[0] << ", " << *min_L_it << endl;
             
+            mcmc.evolve(current_samples, start_pt_idx * N_SAMPLE_CMPTS, min_L_idx * N_SAMPLE_CMPTS, *min_L_it);
 
-
-            double new_pt[N_SAMPLE_CMPTS]{};
-            overwrite_sample(new_pt, current_samples + start_pt_idx * N_SAMPLE_CMPTS);
-            double new_loglike = curr_sample_loglikes[start_pt_idx];
-
-            mcmc.evolve(new_pt, new_loglike, *min_L_it);
-
-            // overwrite current minimum likelihood and associated point
-            overwrite_sample(current_samples + min_L_idx, new_pt);
-            (*min_L_it) = new_loglike;
 
             X_prev_est = exp(-(double)i / N_CONCURRENT_SAMPLES);
 
@@ -122,15 +115,15 @@ int main() {
             //cout << "~~~" << endl;
 
             if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
-                cout << "\rTerminated (evidence accumulation percentage), Z: " << Z;
+                cout << "\rTerminated (evidence accumulation percentage), Z: " << Z << "                                               ";
                 break;
             }
             if (mcmc.step_size() < TERMINATION_STEPSIZE) {
-                cout << "\rTerminated (step size), Z: " << Z;
+                cout << "\rTerminated (step size), Z: " << Z << "                                                 ";
                 break;
             }
             if (i == N_ITERATIONS - 1) {
-                cout << "\rTerminated (max iterations), Z: " << Z;
+                cout << "\rTerminated (max iterations), Z: " << Z << "                                               ";
             }
         }
         
@@ -143,7 +136,7 @@ int main() {
             out_samples.push_back(
                 sample_data(
                     current_samples + i * N_SAMPLE_CMPTS,
-                    curr_sample_loglikes[i], curr_sample_loglikes[i], log(w_est),
+                    curr_sample_loglikes[i], log(w_est),
                     mcmc.step_size(), mcmc.acceptance_rate(),
                     mcmc.acceptance_rate_deriv()
                 )
@@ -171,27 +164,18 @@ int main() {
 
         double drawn_logZ_mean = acc_drawn_logZ / N_ALTERNATIVE_WEIGHT_SAMPLES;
         double drawn_logZ_variance = 0;
-        double max_abs_delta = 0;
         for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
             double delta = alternative_logZ_vals[i] - drawn_logZ_mean;
-
-            if (abs(delta) > max_abs_delta) {
-                max_abs_delta = abs(delta);
-            }
-
             drawn_logZ_variance += delta * delta;
         }
         drawn_logZ_variance /= (N_ALTERNATIVE_WEIGHT_SAMPLES-1);
         double drawn_logZ_std_dev = sqrt(drawn_logZ_variance);
 
 
-
         cout << "Z: " << Z << endl;
-        cout << "logz: " << log(Z) << " +- " << max_abs_delta << endl;
+        cout << "logz: " << log(Z) << " +- " << drawn_logZ_std_dev << endl;
         cout << "-----------------------------------" << endl;
 
-
-        //cout << endl << "------------------------" << endl;
 
         ofstream outfile;
         outfile.open(OUT_PATH + to_string(file_number) + ".txt");
@@ -199,20 +183,15 @@ int main() {
         for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
             outfile << "cmpt_" << i << ",";
         }
-        outfile << "logl,logl2,logv,weight,stepsize,acceptrate,acceptrate_deriv" << endl;
+        outfile << "logl,logv,weight,stepsize,acceptrate,acceptrate_deriv" << endl;
 
         outfile << scientific << setprecision(16);
 
         for (auto sample_data : out_samples) {
-            //cout << sample_data.data_real()[0] << ", " << sample_data.data_real()[1] << ": "
-            //    << sample_data.logl << ", " << sample_data.logv << ", " << sample_data.weight << endl;
-
-
             for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
                 outfile << sample_data.data_real()[i] << ",";
             }
-            outfile << sample_data.logl << "," << sample_data.logl2 
-             << "," << sample_data.logv << "," << sample_data.weight
+            outfile << sample_data.logl << "," << sample_data.logv << "," << sample_data.weight
              << "," << sample_data.stepsize << "," << sample_data.acceptrate
              << "," << sample_data.acceptrate_deriv << endl;
         }

@@ -14,11 +14,23 @@ uniform_int_distribution<int> uniform_rand_sample(0, N_CONCURRENT_SAMPLES - 1);
 //-------------- LIKELIHOOD RELATED THINGS ----------------//
 
 double single_gaussian_loglike_from_sample(double* p) {
-    double acc = 0;//-log(2. * 3.14159265) * N_SAMPLE_CMPTS * 0.5;
+    double acc = -log(2. * 3.14159265) * N_SAMPLE_CMPTS * 0.5;
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
         acc -= p[i] * p[i] / (2.); //(p[i] - i) * (p[i] - i);
     }
     return acc;
+}
+
+double* grad_single_gaussian_loglike_from_sample(double* p) {
+    double normal[N_SAMPLE_CMPTS]{};
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        normal[i] -= p[i]; //(p[i] - i) * (p[i] - i);
+    }
+    normalise_vec(normal, N_SAMPLE_CMPTS);
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+    }
+
+    return normal;
 }
 
 double gaussian_sum_loglike_from_sample(double* p) {
@@ -46,7 +58,7 @@ double gaussian_sum_loglike_from_sample(double* p) {
 
 
 double loglike_from_sample_vec(double* p) {
-    return gaussian_sum_loglike_from_sample(p);
+    return single_gaussian_loglike_from_sample(p);
 }
 
 double loglike_from_cmplx(cmplx* p) {
@@ -56,7 +68,7 @@ double loglike_from_cmplx(cmplx* p) {
 //---------------- PRIOR RELATED THINGS -------------------//
 
 double gen_prior_elem() {
-    return 50 * (2 * uniform_01(rand_gen) - 1); //* pow(1./N_SAMPLE_CMPTS, 0.5) ;
+    return 5 * (2 * uniform_01(rand_gen) - 1); //* pow(1./N_SAMPLE_CMPTS, 0.5) ;
 }
 
 double* gen_prior() {
@@ -68,7 +80,7 @@ double* gen_prior() {
 }
 
 bool is_elem_in_prior_range(double elem) {
-    return (elem > -50 && elem < 50);
+    return (elem > -5 && elem < 5);
 }
 
 bool is_in_prior_range(double* sample) {

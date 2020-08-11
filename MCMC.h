@@ -17,7 +17,7 @@ protected:
 		k_prop_(k_prop),
 		k_deriv_(k_deriv)
 	{
-		if (buffer_size <= 5) {
+		if (buffer_size < 5) {
 			throw std::logic_error("Too small buffer");
 		}
 	}
@@ -49,7 +49,7 @@ public:
 		return ref_step_size_ * exp(step_constant_);
 	}
 
-	virtual void evolve(double* point, double& loglike, double min_loglike) = 0;
+	virtual void evolve(double* all_samples, int idx_to_evolve, int idx_to_write, double& min_loglike) = 0;
 };
 
 
@@ -61,17 +61,32 @@ public:
 	BallWalkMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv) :
 		MCMCWalk(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv) {}
 
-	void evolve(double* point, double& loglike, double min_loglike);
+	void evolve(double* all_samples, int idx_to_evolve, int idx_to_write, double& min_loglike);
 };
 
 class GalileanMCMC : public MCMCWalk {
 
+	double velocities_[N_SAMPLE_CMPTS * N_CONCURRENT_SAMPLES];
 	bool step(double* const old_pt, double* new_pt, double old_loglike, double& new_loglike);
 
 public:
 	GalileanMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv) :
-		MCMCWalk(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv) {}
+		MCMCWalk(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv), velocities_() {
 
-	void evolve(double* point, double& loglike, double min_loglike);
+		for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
+			double vec_total = 0;
+			for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
+				velocities_[i * N_SAMPLE_CMPTS + j] = uniform_01(rand_gen);
+				vec_total += velocities_[i * N_SAMPLE_CMPTS + j] *velocities_[i * N_SAMPLE_CMPTS + j];
+			}
+			vec_total = sqrt(vec_total);
+			for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
+				velocities_[i * N_SAMPLE_CMPTS + j] /= vec_total;
+			}
+		}
+
+	}
+
+	void evolve(double* all_samples, int idx_to_evolve, int idx_to_write, double& min_loglike);
 };
 
