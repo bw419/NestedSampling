@@ -4,19 +4,27 @@
 using namespace std;
 
 
-void MCMCWalk::adjust_step_size() {
+void MCMCWalker::adjust_step_size() {
     if (n_success_buffer_.size() > 0) {
         // acceptance rate too high
         // -> rate_error +ve
         // -> decrease step constant
         // -> decrease step rate = initial size * e^(-step constant)
         double rate_error = calculate_acceptance_rate(false) - target_acceptance_rate_;
-        step_constant_ += k_prop_ * rate_error + k_deriv_ * acceptance_rate_deriv_;
+        double adjust_amount = k_prop_ * rate_error + k_deriv_ * acceptance_rate_deriv_;
+        double thresh = 1 ;
+        if (abs(adjust_amount) > thresh) {
+            cout << "ahh " << adjust_amount << "  " << adjust_amount / abs(adjust_amount);
+            step_constant_ += thresh * adjust_amount/abs(adjust_amount);
+        }
+        else {
+            step_constant_ += adjust_amount;
+        }
     }
 }
 
 
-double MCMCWalk::calculate_acceptance_rate(bool print_stats) {
+double MCMCWalker::calculate_acceptance_rate(bool print_stats) {
     double total_successes = 0;
     double total_steps = N_STEPS_PER_SAMPLE * ((double)n_success_buffer_.size());
     total_successes += curr_walk_successes_;
@@ -31,9 +39,17 @@ double MCMCWalk::calculate_acceptance_rate(bool print_stats) {
     }
 
     acceptance_rate_deriv_ = total_successes / total_steps - acceptance_rate_;
+
+
+    if (total_steps < N_STEPS_PER_SAMPLE) {
+        acceptance_rate_deriv_ = 0;
+    }
+
     acceptance_rate_ = total_successes / total_steps;
 
     if (print_stats) {
+        cout << "total successes: " << total_successes << ", ";
+        cout << "total steps: " << total_steps << ", ";
         cout << "rate: " << acceptance_rate_ << ", ";
         cout << "step size: " << step_size() << endl;
     }
@@ -42,24 +58,22 @@ double MCMCWalk::calculate_acceptance_rate(bool print_stats) {
 }
 
 
-double MCMCWalk::acceptance_rate() {
+double MCMCWalker::acceptance_rate() {
     return acceptance_rate_;
 }
-double MCMCWalk::acceptance_rate_deriv() {
+double MCMCWalker::acceptance_rate_deriv() {
     return acceptance_rate_deriv_;
 }
 
 
-bool BallWalkMCMC::step(double* const old_pt, double* new_pt, double min_loglike, double& new_loglike) {
+bool BallWalkMCMC::step(double* samples, int idx_to_write, double* new_pt, double min_loglike, double& new_loglike) {
     double sigma = step_size();// *pow(N_SAMPLE_CMPTS, -0.5);
 
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-        new_pt[i] = old_pt[i] + std_normal(rand_gen) * sigma; //2 * uniform_01(rand_gen) - 1;
+        new_pt[i] = samples[idx_to_write + i] + std_normal(rand_gen) * sigma; //2 * uniform_01(rand_gen) - 1;
     }
 
     new_loglike = this->loglike_fn_(new_pt);
-
-    //cout << "-- " << old_pt[0] << ", " << new_pt[0] << ", " << new_loglike << ", " << sigma << ":";
 
     if (new_loglike > min_loglike && is_in_prior_range(new_pt)) {
         return true;
@@ -72,7 +86,6 @@ bool BallWalkMCMC::step(double* const old_pt, double* new_pt, double min_loglike
 
 void BallWalkMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, double& min_pt_loglike) {
 
-    curr_walk_successes_ = 0;
     overwrite_sample(samples + idx_to_write, samples + idx_to_evolve);
     double loglike_thresh = min_pt_loglike;
 
@@ -82,7 +95,7 @@ void BallWalkMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, 
         double next_pt[N_SAMPLE_CMPTS]{};
         double next_loglike = 0;
 
-        step_success = step(samples + idx_to_write, next_pt, loglike_thresh, next_loglike);
+        step_success = step(samples, idx_to_write, next_pt, loglike_thresh, next_loglike);
 
         if (step_success) {
             ++curr_walk_successes_;
@@ -93,90 +106,124 @@ void BallWalkMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, 
         }
 
     }
-    adjust_step_size();
-
     n_success_buffer_.push(curr_walk_successes_);
-}
-
-
-
-bool GalileanMCMC::step(double* const old_pt, double* new_pt, double min_loglike, double& new_loglike) {
-    double sigma = step_size(); // *pow(N_SAMPLE_CMPTS, -0.5);
-
-    double N[N_SAMPLE_CMPTS]{};
-    bool N_ok;
-
-    new_loglike = this->loglike_fn_(new_pt);
-
-    return true;
-
-    //if (N_ok) {
-    //    //write new pt as N
-    //    return true;
-    //}
-
-    //double* S;
-    //bool S_ok;
-    //double* E;
-    //bool E_ok;
-    //double* W;
-    //bool W_ok;
-
-    //if (!S_ok) {
-    //    return false;
-    //}
-    //else if (E_ok && !W_ok) {
-    //    return true;
-    //}
-    //else if (W_ok && !E_ok) {
-    //    return true;
-    //}
-    //else {
-    //    return false;
-    //}
-}
-
-
-void GalileanMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, double& min_loglike) {
-
+    curr_step_number_ = -1;
     curr_walk_successes_ = 0;
-    bool overall_success = false;
-    double loglike_out = 0;
 
-    //cout << point[0] << ", " << loglike << endl;
+    adjust_step_size();
+}
 
+
+bool GalileanMCMC::step(double* samples, int idx_to_evolve, double* new_pt, double min_loglike, double& new_loglike) {
+    double step = step_size(); // *pow(N_SAMPLE_CMPTS, -0.5);
+
+
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        new_pt[i] = samples[idx_to_evolve + i] + step * velocity_[i];
+    }
+
+    new_loglike = this->loglike_fn_(new_pt) ;
+
+
+    //cout << "new_loglike: " << new_loglike << ", old: " << this->loglike_fn_(samples + idx_to_evolve) << ", step size: " << step << endl;
+
+    if (new_loglike > min_loglike && is_in_prior_range(new_pt)) {
+        ++curr_walk_successes_;
+        return true;
+    }
+
+    //cout << "\nhad to reflect." << endl;
+
+    // try to reflect.
+    // v1 = norm here
+    double v1[N_SAMPLE_CMPTS]{};
+    this->grad_loglike_fn_(new_pt, v1);
+    normalise_vec(v1, N_SAMPLE_CMPTS);
+
+    //cout << "old v: ";
+    double dot_prod_doubled = 0;
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        //cout << velocity_[i] << ", ";
+        dot_prod_doubled += 2*velocity_[i] * v1[i];
+    }
+    //cout << endl;
+
+    //cout << "normal: ";
+    //for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+    //    cout << v1[i] << ", ";
+    //}
+    //cout << endl;
+
+    //cout << "new v: ";
+
+    // now v1 = reflection velocity
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        v1[i] = velocity_[i] - dot_prod_doubled * v1[i];
+        //cout << v1[i] << ", ";
+    }
+    //cout << endl;
+
+
+    // continue to new point
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        new_pt[i] += v1[i]*step;
+    }
+
+    // see if the new location is OK
+    new_loglike = this->loglike_fn_(new_pt);
+    //cout << "new: " << new_pt[0] << ", min: " << loglike_to_rad(min_loglike) << ", in range: " << is_in_prior_range(new_pt) << endl;
+    if (new_loglike > min_loglike && is_in_prior_range(new_pt)) {
+        //cout << "good new point!" << endl;
+        // confirm new velocity
+        for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+            velocity_[i] = v1[i];
+            //cout << velocity_[i] << ", ";
+        }
+        //cout << endl;
+        return true;
+    }
+    //cout << "bad new point!" << endl;
+
+    // reflection failed - reverse the velocity and return.
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        velocity_[i] = -velocity_[i];
+        //cout << velocity_[i] << ", ";
+    }
+    //cout << endl;
+
+    return false;
+}
+
+
+void GalileanMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, double& min_pt_loglike) {
+
+    overwrite_sample(samples + idx_to_write, samples + idx_to_evolve);
+    double loglike_thresh = min_pt_loglike;
+
+    // set isotropic initial velocity for the run.
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        velocity_[i] = std_normal(rand_gen);
+    }
+    normalise_vec(velocity_, N_SAMPLE_CMPTS);
+
+    // step loop
     for (curr_step_number_ = 0; curr_step_number_ < N_STEPS_PER_SAMPLE; ++curr_step_number_) {
-        bool step_success = false;
+        bool step_accepted = false;
         double next_pt[N_SAMPLE_CMPTS]{};
         double next_loglike = 0;
 
-        step_success = step(samples + idx_to_evolve, next_pt, min_loglike, next_loglike);
+        step_accepted = step(samples, idx_to_write, next_pt, loglike_thresh, next_loglike);
 
-        if (step_success) {
-            overall_success = true;
-            ++curr_walk_successes_;
-
+        if (step_accepted) {
             // move the new point into old_pt as the origin of next ball walk step
-            overwrite_sample(samples + idx_to_evolve, next_pt);
-            loglike_out = next_loglike;
+            overwrite_sample(samples + idx_to_write, next_pt);
+            min_pt_loglike = next_loglike;
         }
 
-        if (!overall_success) {
-            //cout << next_loglike << "/";
-        }
-
-
-        //if (curr_step_number_ % (int)(N_STEPS_PER_SAMPLE/10) == 0) {}
-        //cout << step_size() << endl;
     }
-    adjust_step_size();
-
-    //if (!overall_success) {
-    //    cout << "!";
-    //}
-    //cout << point[0] << "~:~:~" <<  endl;
-
     n_success_buffer_.push(curr_walk_successes_);
+    curr_walk_successes_ = 0;
+    curr_step_number_ = -1;
 
-    min_loglike = loglike_out;
+    adjust_step_size();
 }

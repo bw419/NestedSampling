@@ -3,11 +3,11 @@
 #include "CircBuffer.h"
 
 
-class MCMCWalk {
+class MCMCWalker {
 
 protected:
 
-	MCMCWalk(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv) :
+	MCMCWalker(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv) :
 		ref_step_size_(initial_step_size_guess),
 		loglike_fn_(loglike_fn_ptr),
 		n_success_buffer_(buffer_size),
@@ -17,7 +17,7 @@ protected:
 		k_prop_(k_prop),
 		k_deriv_(k_deriv)
 	{
-		if (buffer_size < 5) {
+		if (buffer_size < 5 && N_SAMPLE_CMPTS >= 5) {
 			throw std::logic_error("Too small buffer");
 		}
 	}
@@ -37,7 +37,7 @@ protected:
 
 	CircularBuffer<unsigned short> n_success_buffer_;
 
-	virtual bool step(double* const old_pt, double* new_pt, double old_loglike, double& new_loglike) = 0;
+	virtual bool step(double* old_pt, int idx_to_write, double* new_pt, double old_loglike, double& new_loglike) = 0;
 	void adjust_step_size();
 
 public:
@@ -53,38 +53,29 @@ public:
 };
 
 
-class BallWalkMCMC: public MCMCWalk {
+class BallWalkMCMC: public MCMCWalker {
 
-	bool step(double* const old_pt, double* new_pt, double old_loglike, double& new_loglike);
+	bool step(double* old_pt, int idx_to_write, double* new_pt, double old_loglike, double& new_loglike);
 
 public:
 	BallWalkMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv) :
-		MCMCWalk(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv) {}
+		MCMCWalker(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv) {}
 
 	void evolve(double* all_samples, int idx_to_evolve, int idx_to_write, double& min_loglike);
 };
 
-class GalileanMCMC : public MCMCWalk {
+class GalileanMCMC : public MCMCWalker {
 
-	double velocities_[N_SAMPLE_CMPTS * N_CONCURRENT_SAMPLES];
-	bool step(double* const old_pt, double* new_pt, double old_loglike, double& new_loglike);
+	void (*grad_loglike_fn_) (double const*, double*);
+
+	double velocity_[N_SAMPLE_CMPTS];
+
+	bool step(double* old_pt, int idx_to_write, double* new_pt, double old_loglike, double& new_loglike);
 
 public:
-	GalileanMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv) :
-		MCMCWalk(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv), velocities_() {
-
-		for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
-			double vec_total = 0;
-			for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
-				velocities_[i * N_SAMPLE_CMPTS + j] = uniform_01(rand_gen);
-				vec_total += velocities_[i * N_SAMPLE_CMPTS + j] *velocities_[i * N_SAMPLE_CMPTS + j];
-			}
-			vec_total = sqrt(vec_total);
-			for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
-				velocities_[i * N_SAMPLE_CMPTS + j] /= vec_total;
-			}
-		}
-
+	GalileanMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), void (*grad_loglike_fn_ptr) (double const*, double*), size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv) :
+		MCMCWalker(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv), 
+		velocity_(), grad_loglike_fn_(grad_loglike_fn_ptr) {
 	}
 
 	void evolve(double* all_samples, int idx_to_evolve, int idx_to_write, double& min_loglike);

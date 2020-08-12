@@ -21,16 +21,14 @@ double single_gaussian_loglike_from_sample(double* p) {
     return acc;
 }
 
-double* grad_single_gaussian_loglike_from_sample(double* p) {
-    double normal[N_SAMPLE_CMPTS]{};
-    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-        normal[i] -= p[i]; //(p[i] - i) * (p[i] - i);
-    }
-    normalise_vec(normal, N_SAMPLE_CMPTS);
-    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-    }
+//double loglike_to_rad(double loglike) {
+//    return sqrt(-2 * loglike);
+//}
 
-    return normal;
+void grad_single_gaussian_loglike_from_sample(double const* p, double* grad_out) {
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        grad_out[i] -= p[i]; //(p[i] - i) * (p[i] - i);
+    }
 }
 
 double gaussian_sum_loglike_from_sample(double* p) {
@@ -56,6 +54,10 @@ double gaussian_sum_loglike_from_sample(double* p) {
     return log(out/2.);
 }
 
+
+void grad_loglike_from_sample_vec(double const* p, double* grad_out) {
+    return grad_single_gaussian_loglike_from_sample(p, grad_out);
+}
 
 double loglike_from_sample_vec(double* p) {
     return single_gaussian_loglike_from_sample(p);

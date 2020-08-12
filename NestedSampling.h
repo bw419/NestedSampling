@@ -19,7 +19,7 @@ struct sample_data {
 	double acceptrate_deriv;
 
 	double* data_real();
-	cmplx* data_cmplx();
+	void data_cmplx(cmplx* data_out);
 
 	sample_data(double* data, double logl, double logv, double stepsize, double acceptrate, double acceptrate_deriv) :
 		logl(logl), logv(logv), weight(exp(logl + logv)),

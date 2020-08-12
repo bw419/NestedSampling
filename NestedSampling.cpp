@@ -7,14 +7,11 @@ using namespace std;
 double* sample_data::data_real() {
     return data_;
 }
-cmplx* sample_data::data_cmplx() {
-    cmplx x[N_X_CMPTS]{};
 
+void sample_data::data_cmplx(cmplx* data_out) {
     for (int i = 0; i < N_X_CMPTS; ++i) {
-        x[i] = cmplx(data_[i], data_[N_X_CMPTS + i]);
+        data_out[i] = cmplx(data_[i], data_[N_X_CMPTS + i]);
     }
-
-    return x;
 }
 
 
@@ -64,19 +61,20 @@ int main() {
         double Z = 0;
         double X_prev_est = 1;
         double X_curr_est, w_est;
-        BallWalkMCMC mcmc = BallWalkMCMC(.5, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.001, 10);//0.01, 100);
+        //BallWalkMCMC mcmc = BallWalkMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, max(10,N_CONCURRENT_SAMPLES), .5, 0.001, 10);
+        GalileanMCMC mcmc = GalileanMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, max(10, N_CONCURRENT_SAMPLES), .9, 0.001, 10);
 
 
         for (int i = 1; i <= N_ITERATIONS; ++i) {
 
-            //for (int j = 0; j < N_CONCURRENT_SAMPLES; j+=N_CONCURRENT_SAMPLES/10) {
+            //for (int j = 0; j < N_CONCURRENT_SAMPLES; j+=1){//N_CONCURRENT_SAMPLES/10) {
             //    cout << curr_sample_loglikes[j] << " | ";
             //}
             //cout << endl;
             //cout << "rate, " << mcmc.acceptance_rate() << " | step size, " << mcmc.step_size() << endl;
             //cout << "---------------------------------------------" << endl;
 
-            if (!(i % 500)) {
+            if (!(i % 100)) {
                 //cout << endl;
                 cout << "\riteration " << i << ", success rate: "  << mcmc.acceptance_rate() << ", step size: " << mcmc.step_size() << ", logz: " << log(Z) << "            ";
                 //cout << endl;
@@ -99,15 +97,15 @@ int main() {
             );
 
             int start_pt_idx = uniform_rand_sample(rand_gen);
+
             //cout << "before... " << start_pt_idx << " , " << (current_samples + start_pt_idx * N_SAMPLE_CMPTS)[0] << ", " << *min_L_it << endl;
-            
             mcmc.evolve(current_samples, start_pt_idx * N_SAMPLE_CMPTS, min_L_idx * N_SAMPLE_CMPTS, *min_L_it);
 
 
             X_prev_est = exp(-(double)i / N_CONCURRENT_SAMPLES);
 
+            //cout << "after..." << (current_samples + min_L_idx * N_SAMPLE_CMPTS)[0] << ", " << *min_L_it << endl;
             //cout << "-------------------------------" << endl;
-            //cout << "after..." << (current_samples + min_L_idx)[0] << ", " << *min_L_it << endl;
 
 
             //cout << "~~~" << endl;
