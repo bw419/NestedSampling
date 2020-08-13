@@ -17,9 +17,9 @@ using namespace std;
 #define OUT_PATH "out/samples"
 
 #define N_CONCURRENT_SAMPLES 1000//30
-#define N_X_CMPTS 1
-#define N_SAMPLE_CMPTS 1*N_X_CMPTS
-#define N_STEPS_PER_SAMPLE 100
+#define N_X_CMPTS 3
+#define N_SAMPLE_CMPTS 2*N_X_CMPTS
+#define N_STEPS_PER_SAMPLE 300
 #define N_ITERATIONS 10000
 #define TERMINATION_PERCENTAGE 0.000001
 #define TERMINATION_STEPSIZE 0.000001

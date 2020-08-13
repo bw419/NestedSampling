@@ -62,7 +62,8 @@ int main() {
         double X_prev_est = 1;
         double X_curr_est, w_est;
         //BallWalkMCMC mcmc = BallWalkMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, max(10,N_CONCURRENT_SAMPLES), .5, 0.001, 10);
-        GalileanMCMC mcmc = GalileanMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, max(10, N_CONCURRENT_SAMPLES), .9, 0.001, 10);
+        GalileanMCMC mcmc = GalileanMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, 
+                                         max(10, N_CONCURRENT_SAMPLES), .8, 0.1, 100);
 
 
         for (int i = 1; i <= N_ITERATIONS; ++i) {
@@ -126,9 +127,12 @@ int main() {
         }
         
 
-        cout << endl << "-----------------------------------" << endl;
 
+        cout << endl;
         w_est = (exp(-(double)N_ITERATIONS / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
+        cout << "\rsorting remaining points...";
+        sort(curr_sample_loglikes, curr_sample_loglikes + N_CONCURRENT_SAMPLES);
+        cout << endl << "- - - - - - - - - - - - - - - - - -" << endl;
 
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
             out_samples.push_back(
@@ -172,8 +176,7 @@ int main() {
 
         cout << "Z: " << Z << endl;
         cout << "logz: " << log(Z) << " +- " << drawn_logZ_std_dev << endl;
-        cout << "-----------------------------------" << endl;
-
+        cout << "\rwriting to file...";
 
         ofstream outfile;
         outfile.open(OUT_PATH + to_string(file_number) + ".txt");
@@ -183,7 +186,7 @@ int main() {
         }
         outfile << "logl,logv,weight,stepsize,acceptrate,acceptrate_deriv" << endl;
 
-        outfile << scientific << setprecision(16);
+        outfile << scientific << setprecision(14);
 
         for (auto sample_data : out_samples) {
             for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
@@ -196,6 +199,7 @@ int main() {
 
         outfile.close();
         out_samples.clear();
+        cout << "\r-----------------------------------" << endl;
     }
 }
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

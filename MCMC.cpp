@@ -14,7 +14,7 @@ void MCMCWalker::adjust_step_size() {
         double adjust_amount = k_prop_ * rate_error + k_deriv_ * acceptance_rate_deriv_;
         double thresh = 1 ;
         if (abs(adjust_amount) > thresh) {
-            cout << "ahh " << adjust_amount << "  " << adjust_amount / abs(adjust_amount);
+            //cout << "too much adjustment " << adjust_amount << "  " << adjust_amount / abs(adjust_amount);
             step_constant_ += thresh * adjust_amount/abs(adjust_amount);
         }
         else {
