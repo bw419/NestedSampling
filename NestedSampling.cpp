@@ -58,14 +58,14 @@ int main() {
             overwrite_sample(&current_samples[i * N_SAMPLE_CMPTS], gen_prior());
             curr_sample_loglikes[i] = loglike_from_sample_vec(&current_samples[i * N_SAMPLE_CMPTS]);
         }
-
+        
 
         double Z = 0;
         double X_prev_est = 1;
         double X_curr_est, w_est;
-        //BallWalkMCMC mcmc = BallWalkMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, max(10,N_CONCURRENT_SAMPLES), .5, 0.001, 10);
-        GalileanMCMC mcmc = GalileanMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, 
-                                         max(10, N_CONCURRENT_SAMPLES), .8, 0.1, 100);
+        BallWalkMCMC mcmc = BallWalkMCMC(.5, loglike_from_sample_vec, max(10,N_CONCURRENT_SAMPLES), .5, 0.001, 10);
+        //GalileanMCMC mcmc = GalileanMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, 
+        //                                 max(10, N_CONCURRENT_SAMPLES), .8, 0.1, 100, 0.2);
 
 
         for (int i = 1; i <= N_ITERATIONS; ++i) {

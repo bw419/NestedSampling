@@ -113,6 +113,17 @@ void BallWalkMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, 
     adjust_step_size();
 }
 
+void GalileanMCMC::perturb_velocity() {
+    double new_v[N_SAMPLE_CMPTS]{};
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        new_v[i] = std_normal(rand_gen);
+    }
+    normalise_vec(new_v, N_SAMPLE_CMPTS);
+    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+        velocity_[i] = velocity_[i] * cos(perturbation_theta_) + new_v[i] * sin(perturbation_theta_);
+    }
+}
+
 
 bool GalileanMCMC::step(double* samples, int idx_to_evolve, double* new_pt, double min_loglike, double& new_loglike) {
     double step = step_size(); // *pow(N_SAMPLE_CMPTS, -0.5);
@@ -214,12 +225,15 @@ void GalileanMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, 
 
         step_accepted = step(samples, idx_to_write, next_pt, loglike_thresh, next_loglike);
 
+        if (curr_step_number_ % 10 == 0) {
+            perturb_velocity();
+        }
+
         if (step_accepted) {
             // move the new point into old_pt as the origin of next ball walk step
             overwrite_sample(samples + idx_to_write, next_pt);
             min_pt_loglike = next_loglike;
         }
-
     }
     n_success_buffer_.push(curr_walk_successes_);
     curr_walk_successes_ = 0;

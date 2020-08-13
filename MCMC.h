@@ -69,13 +69,16 @@ class GalileanMCMC : public MCMCWalker {
 	void (*grad_loglike_fn_) (double const*, double*);
 
 	double velocity_[N_SAMPLE_CMPTS];
+	double perturbation_theta_; // in radians
+	void perturb_velocity();
 
 	bool step(double* old_pt, int idx_to_write, double* new_pt, double old_loglike, double& new_loglike);
 
 public:
-	GalileanMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), void (*grad_loglike_fn_ptr) (double const*, double*), size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv) :
+	GalileanMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (double*), void (*grad_loglike_fn_ptr) (double const*, double*),
+		size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv, double perturbation_theta) :
 		MCMCWalker(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv), 
-		velocity_(), grad_loglike_fn_(grad_loglike_fn_ptr) {
+		velocity_(), grad_loglike_fn_(grad_loglike_fn_ptr), perturbation_theta_(perturbation_theta) {
 	}
 
 	void evolve(double* all_samples, int idx_to_evolve, int idx_to_write, double& min_loglike);

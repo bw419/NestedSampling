@@ -4,11 +4,14 @@
 double loglike_from_sample_vec(double* p);
 double loglike_from_cmplx(cmplx* p);
 void grad_loglike_from_sample_vec(double const* p, double* grad_out);
+
+
 double single_gaussian_loglike_from_sample(double* p);
 double gaussian_sum_loglike_from_sample(double* p);
+void radially_symmetric_grad_loglike(double const* p, double* grad_out);
 
 
-double loglike_to_rad(double loglike);
+//double loglike_to_rad(double loglike);
 
 
 double gen_prior_elem();
