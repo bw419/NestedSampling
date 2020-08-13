@@ -51,6 +51,8 @@ int main() {
     // loop entire program, ii=filename number
     for (int file_number = 0; file_number < 10; ++file_number) {
 
+        clock_t start_t = clock();
+
         // generate initial points
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
             overwrite_sample(&current_samples[i * N_SAMPLE_CMPTS], gen_prior());
@@ -125,14 +127,13 @@ int main() {
                 cout << "\rTerminated (max iterations), Z: " << Z << "                                               ";
             }
         }
-        
 
 
         cout << endl;
         w_est = (exp(-(double)N_ITERATIONS / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
         cout << "\rsorting remaining points...";
         sort(curr_sample_loglikes, curr_sample_loglikes + N_CONCURRENT_SAMPLES);
-        cout << endl << "- - - - - - - - - - - - - - - - - -" << endl;
+        cout << "\r- - - - - - - - - - - - - - - - - -" << endl;
 
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
             out_samples.push_back(
@@ -147,6 +148,7 @@ int main() {
         }
 
 
+        cout << "elapsed time: " << (double)(clock() - start_t)/CLOCKS_PER_SEC << "s" << endl;
 
         double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES] {};
 
