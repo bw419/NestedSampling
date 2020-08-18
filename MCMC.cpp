@@ -66,11 +66,11 @@ double MCMCWalker::acceptance_rate_deriv() {
 }
 
 
-bool BallWalkMCMC::step(double* samples, int idx_to_write, double* new_pt, double min_loglike, double& new_loglike) {
+bool BallWalkMCMC::step(sample_collection &samples, int idx_to_write, sample_vec &new_pt, double min_loglike, double& new_loglike) {
     double sigma = step_size();// *pow(N_SAMPLE_CMPTS, -0.5);
 
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-        new_pt[i] = samples[idx_to_write + i] + std_normal(rand_gen) * sigma; //2 * uniform_01(rand_gen) - 1;
+        new_pt[i] = samples[idx_to_write][i] + std_normal(rand_gen) * sigma; //2 * uniform_01(rand_gen) - 1;
     }
 
     new_loglike = this->loglike_fn_(new_pt);
@@ -84,16 +84,20 @@ bool BallWalkMCMC::step(double* samples, int idx_to_write, double* new_pt, doubl
 }
 
 
-void BallWalkMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, double& min_pt_loglike) {
+void BallWalkMCMC::evolve(sample_collection &samples, int idx_to_evolve, int idx_to_write, double& min_pt_loglike) {
 
-    overwrite_sample(samples + idx_to_write, samples + idx_to_evolve);
+    overwrite_sample(samples[idx_to_write], samples[idx_to_evolve]);
     double loglike_thresh = min_pt_loglike;
+    double next_loglike = 0;
 
+    //cout << "samples size: " << sizeof(samples) << ", " << sizeof(double) << ", " << (samples).size() / sizeof(double) << endl;
+
+    //print_vec("to evolve", samples, samples.size());
 
     for (curr_step_number_ = 0; curr_step_number_ < N_STEPS_PER_SAMPLE; ++curr_step_number_) {
         bool step_success = false;
-        double next_pt[N_SAMPLE_CMPTS]{};
-        double next_loglike = 0;
+        sample_vec next_pt{};
+        next_loglike = 0;
 
         step_success = step(samples, idx_to_write, next_pt, loglike_thresh, next_loglike);
 
@@ -101,7 +105,7 @@ void BallWalkMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, 
             ++curr_walk_successes_;
 
             // move the new point into old_pt as the origin of next ball walk step
-            overwrite_sample(samples + idx_to_write, next_pt);
+            overwrite_sample(samples[idx_to_write], next_pt);
             min_pt_loglike = next_loglike;
         }
 
@@ -114,23 +118,23 @@ void BallWalkMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, 
 }
 
 void GalileanMCMC::perturb_velocity() {
-    double new_v[N_SAMPLE_CMPTS]{};
+    sample_vec new_v{};
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
         new_v[i] = std_normal(rand_gen);
     }
-    normalise_vec(new_v, N_SAMPLE_CMPTS);
+    normalise_vec(new_v);
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
         velocity_[i] = velocity_[i] * cos(perturbation_theta_) + new_v[i] * sin(perturbation_theta_);
     }
 }
 
 
-bool GalileanMCMC::step(double* samples, int idx_to_evolve, double* new_pt, double min_loglike, double& new_loglike) {
+bool GalileanMCMC::step(sample_collection &samples, int idx_to_evolve, sample_vec &new_pt, double min_loglike, double& new_loglike) {
     double step = step_size(); // *pow(N_SAMPLE_CMPTS, -0.5);
 
 
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-        new_pt[i] = samples[idx_to_evolve + i] + step * velocity_[i];
+        new_pt[i] = samples[idx_to_evolve][i] + step * velocity_[i];
     }
 
     new_loglike = this->loglike_fn_(new_pt) ;
@@ -147,9 +151,9 @@ bool GalileanMCMC::step(double* samples, int idx_to_evolve, double* new_pt, doub
 
     // try to reflect.
     // v1 = norm here
-    double v1[N_SAMPLE_CMPTS]{};
+    sample_vec v1{};
     this->grad_loglike_fn_(new_pt, v1);
-    normalise_vec(v1, N_SAMPLE_CMPTS);
+    normalise_vec(v1);
 
     //cout << "old v: ";
     double dot_prod_doubled = 0;
@@ -206,21 +210,21 @@ bool GalileanMCMC::step(double* samples, int idx_to_evolve, double* new_pt, doub
 }
 
 
-void GalileanMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, double& min_pt_loglike) {
+void GalileanMCMC::evolve(sample_collection &samples, int idx_to_evolve, int idx_to_write, double& min_pt_loglike) {
 
-    overwrite_sample(samples + idx_to_write, samples + idx_to_evolve);
+    overwrite_sample(samples[idx_to_write], samples[idx_to_evolve]);
     double loglike_thresh = min_pt_loglike;
 
     // set isotropic initial velocity for the run.
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
         velocity_[i] = std_normal(rand_gen);
     }
-    normalise_vec(velocity_, N_SAMPLE_CMPTS);
+    normalise_vec(velocity_);
 
     // step loop
     for (curr_step_number_ = 0; curr_step_number_ < N_STEPS_PER_SAMPLE; ++curr_step_number_) {
         bool step_accepted = false;
-        double next_pt[N_SAMPLE_CMPTS]{};
+        sample_vec next_pt{};
         double next_loglike = 0;
 
         step_accepted = step(samples, idx_to_write, next_pt, loglike_thresh, next_loglike);
@@ -231,7 +235,7 @@ void GalileanMCMC::evolve(double* samples, int idx_to_evolve, int idx_to_write, 
 
         if (step_accepted) {
             // move the new point into old_pt as the origin of next ball walk step
-            overwrite_sample(samples + idx_to_write, next_pt);
+            overwrite_sample(samples[idx_to_write], next_pt);
             min_pt_loglike = next_loglike;
         }
     }

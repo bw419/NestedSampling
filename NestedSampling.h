@@ -10,7 +10,7 @@ vector<double> draw_weight_set(size_t n_samples);
 
 struct sample_data {
 
-	double data_[N_SAMPLE_CMPTS] {};
+	sample_vec data_{};
 	double weight;
 	double logv;
 	double logl;
@@ -18,10 +18,10 @@ struct sample_data {
 	double acceptrate;
 	double acceptrate_deriv;
 
-	double* data_real();
-	void data_cmplx(cmplx* data_out);
+	sample_vec data_real();
+	cmplx_vec data_cmplx();
 
-	sample_data(double* data, double logl, double logv, double stepsize, double acceptrate, double acceptrate_deriv) :
+	sample_data(sample_vec data, double logl, double logv, double stepsize, double acceptrate, double acceptrate_deriv) :
 		logl(logl), logv(logv), weight(exp(logl + logv)),
 		stepsize(stepsize), acceptrate(acceptrate),
 		acceptrate_deriv(acceptrate_deriv) {

@@ -11,35 +11,44 @@
 #include <math.h>
 #include <ctime>
 #include <tuple>
-
-using namespace std;
+#include <array>
 
 
 #define OUT_PATH "out/samples"
 
-#define N_CONCURRENT_SAMPLES 1000//30
-#define N_X_CMPTS 5
+#define N_CONCURRENT_SAMPLES 2000//30
+#define N_X_CMPTS 10
 #define N_SAMPLE_CMPTS 2*N_X_CMPTS
+#define N_IMAGE_CMPTS (6*(N_X_CMPTS+1))
 #define N_STEPS_PER_SAMPLE 200
-#define N_ITERATIONS 10000
+#define N_ITERATIONS 100000
 #define TERMINATION_PERCENTAGE 0.000001
 #define TERMINATION_STEPSIZE 0.000001
+
+using namespace std;
+typedef complex<double> cmplx;
+typedef array<double, N_SAMPLE_CMPTS> sample_vec;
+typedef array<double, N_IMAGE_CMPTS> image_vec;
+typedef array<sample_vec, N_CONCURRENT_SAMPLES> sample_collection;
+typedef array<cmplx, N_X_CMPTS> cmplx_vec;
+typedef array<cmplx, N_X_CMPTS+1> cmplx_vec_prepended;
+
+
 
 #define N_ALTERNATIVE_WEIGHT_SAMPLES 20
 
 #define SQRT_2_PI 2.506628275
 #define SQRT_2 1.414213562
-
-using namespace std;
-typedef complex<double> cmplx;
-
-extern default_random_engine rand_gen;
-extern normal_distribution<double> std_normal;
-extern uniform_real_distribution<double> uniform_01;
-extern uniform_int_distribution<int> uniform_rand_sample;
+#define SQRT_3 1.732050808
+#define INV_SQRT_2 0.707106781
+#define INV_SQRT_3 0.577350269
 
 
-void overwrite_sample(double* old_sample, double* new_sample);
-void print_vec(double* p, string name);
-void normalise_vec(double* p, int length);
-double get_vec_norm(double* p, int length);
+
+
+
+
+void overwrite_sample(sample_vec &old_sample, const sample_vec &new_sample);
+void print_vec(string name, double* vec, int length);
+void normalise_vec(sample_vec &vec);
+double get_vec_norm(const sample_vec &vec);
