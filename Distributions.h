@@ -23,6 +23,8 @@ void intitialise_phase_reconstruction();
 double pr_loglike_from_cmplx(const cmplx_vec &v_in);
 double pr_loglike_from_sample(const sample_vec &v_in);
 
+sample_vec grad_pr_loglike_from_sample(const sample_vec& v_in);
+sample_vec grad_pr_loglike_from_cmplx(const cmplx_vec& v_in);
 
 double single_gaussian_loglike_from_sample(const sample_vec &p);
 double gaussian_sum_loglike_from_sample(const sample_vec &p);

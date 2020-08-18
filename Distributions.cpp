@@ -13,19 +13,25 @@ normal_distribution<double> uniform_circ(0, INV_SQRT_2);
 cmplx_vec_prepended actual_x{ {} };// { {1, 0}, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
 image_vec observed_y = { {} };
 
-
-//-------------- LIKELIHOOD RELATED THINGS ----------------//
-
 cmplx gen_circular_gaussian() {
     return { uniform_circ(rand_gen), uniform_circ(rand_gen) };
 }
 
+//-------------- LIKELIHOOD RELATED THINGS ----------------//
+
+
+// Nested function calls should be optimised away.
 double loglike_from_sample_vec(const sample_vec& p) {
     return pr_loglike_from_sample(p);
     //return gaussian_sum_loglike_from_sample(p);
 }
 
-typedef array<array<cmplx, N_IMAGE_CMPTS>, N_X_CMPTS+1> t_mat;
+sample_vec grad_loglike_from_sample_vec(const sample_vec& p) {
+    return grad_pr_loglike_from_sample(p);
+}
+
+
+typedef array<array<cmplx, N_X_CMPTS + 1>, N_IMAGE_CMPTS> t_mat;
 t_mat transform_mat{};
 void intitialise_phase_reconstruction() {
     cout << scientific << setprecision(2);
@@ -65,7 +71,7 @@ void intitialise_phase_reconstruction() {
         cmplx sum = 0;
         for (int j = 0; j < N_X_CMPTS + 1; ++j) {
             //cout << " " << actual_x[j] << "," << transform_mat[i * (N_X_CMPTS + 1) + j];
-            sum += actual_x[j] * transform_mat[i * (N_X_CMPTS + 1) + j];
+            sum += actual_x[j] * transform_mat[i][j];
             //cout << "->" << observed_y[i] << " ";
         }
         //cout << ") | " ;
@@ -73,13 +79,12 @@ void intitialise_phase_reconstruction() {
         cout << observed_y[i] << " | ";
     }
     cout << endl;
-
 }
 
 
 cmplx_vec sample_to_cmplx(const sample_vec &in) {
     cmplx_vec out{};
-    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+    for (int i = 0; i < N_X_CMPTS; ++i) {
         out[i].real(in[i]);
         out[i].imag(in[i + N_X_CMPTS]);
     }
@@ -89,7 +94,7 @@ cmplx_vec sample_to_cmplx(const sample_vec &in) {
 
 sample_vec cmplx_to_sample(const cmplx_vec &in) {
     sample_vec out{};
-    for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+    for (int i = 0; i < N_X_CMPTS; ++i) {
         out[i] = in[i].real();
         out[i + N_X_CMPTS] = in[i].imag();
     }
@@ -97,6 +102,7 @@ sample_vec cmplx_to_sample(const cmplx_vec &in) {
 }
 
 
+// Nested function calls should be optimised away.
 double pr_loglike_from_sample(const sample_vec &v_in) {
     return pr_loglike_from_cmplx(sample_to_cmplx(v_in));
 }
@@ -115,6 +121,7 @@ double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
 }
 
 
+// Nested function calls should be optimised away.
 sample_vec grad_pr_loglike_from_sample(const sample_vec &v_in) {
     return grad_pr_loglike_from_cmplx(sample_to_cmplx(v_in));
 }
@@ -135,11 +142,12 @@ sample_vec grad_pr_loglike_from_cmplx(const cmplx_vec &v_in) {
     for (int i = 0; i < N_X_CMPTS; ++i) {
         cmplx cmplx_grad_term = 0;
         for (int k = 0; k < N_IMAGE_CMPTS; ++k) {
-            cmplx_grad_term -= (observed_y[k] - abs(transformed[k])) * (conj(transformed[k]) / abs(transformed[k])) * transform_mat[i + 1][k];
+            cmplx_grad_term -= (observed_y[k] - abs(transformed[k])) * (conj(transformed[k]) / abs(transformed[k])) * transform_mat[k][i + 1];
         }
         grad[i] = cmplx_grad_term.real();
         grad[i + N_X_CMPTS] = cmplx_grad_term.imag();
     }
+
     return grad;
 }
 
@@ -190,9 +198,6 @@ sample_vec radially_symmetric_grad_loglike(const sample_vec &p) {
     return grad_out;
 }
 
-sample_vec grad_loglike_from_sample_vec(const sample_vec &p) {
-    return radially_symmetric_grad_loglike(p);
-}
 
 //---------------- PRIOR RELATED THINGS -------------------//
 
