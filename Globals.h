@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -16,12 +17,12 @@
 
 #define OUT_PATH "out/samples"
 
-#define N_CONCURRENT_SAMPLES 2000//30
-#define N_X_CMPTS 10
+#define N_CONCURRENT_SAMPLES 1000//30
+#define N_X_CMPTS 2
 #define N_SAMPLE_CMPTS 2*N_X_CMPTS
 #define N_IMAGE_CMPTS (6*(N_X_CMPTS+1))
 #define N_STEPS_PER_SAMPLE 200
-#define N_ITERATIONS 100000
+#define N_ITERATIONS 1000000
 #define TERMINATION_PERCENTAGE 0.000001
 #define TERMINATION_STEPSIZE 0.000001
 
@@ -36,6 +37,7 @@ typedef array<cmplx, N_X_CMPTS+1> cmplx_vec_prepended;
 
 
 #define N_ALTERNATIVE_WEIGHT_SAMPLES 20
+#define N_NEIGHBOURS 15
 
 #define SQRT_2_PI 2.506628275
 #define SQRT_2 1.414213562

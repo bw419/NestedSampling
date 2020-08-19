@@ -11,6 +11,7 @@ void overwrite_sample(sample_vec &old_sample, const sample_vec &new_sample) {
     }
 }
 
+
 void print_vec(string name, double* vec, int length) {
     cout << name << ": ";
     for (int i = 0; i < length; ++i) {
@@ -28,6 +29,7 @@ void normalise_vec(sample_vec& vec){
         vec[i] /= norm;
     }
 }
+
 
 double get_vec_norm(const sample_vec& vec) {
     double tot = 0;

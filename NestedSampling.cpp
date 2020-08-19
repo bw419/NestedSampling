@@ -4,14 +4,11 @@
 
 using namespace std;
 
-sample_vec sample_data::data_real() {
-    return data_;
-}
 
 cmplx_vec sample_data::data_cmplx() {
     cmplx_vec data_out{};
     for (int i = 0; i < N_X_CMPTS; ++i) {
-        data_out[i] = cmplx(data_[i], data_[N_X_CMPTS + i]);
+        data_out[i] = cmplx(data[i], data[N_X_CMPTS + i]);
     }
     return data_out;
 }
@@ -42,6 +39,11 @@ vector<double> draw_weight_set(size_t n_samples) {
 }
 
 
+bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
+    return p1.first > p2.first;
+}
+
+
 
 sample_collection current_samples{};
 array<double, N_CONCURRENT_SAMPLES> curr_sample_loglikes{};
@@ -51,11 +53,12 @@ vector<sample_data> out_samples;
 int main() {
 
     // loop entire program, ii=filename number
-    for (int file_number = 0; file_number < 5; ++file_number) {
+    for (int file_number = 0; file_number < 1; ++file_number) {
 
         intitialise_phase_reconstruction();
 
         clock_t start_t = clock();
+
 
         // generate initial points
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
@@ -143,7 +146,7 @@ int main() {
         w_est = (exp(-(double)(it) / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
         cout << "\rsorting remaining points...";
         sort(curr_sample_loglikes.begin(), curr_sample_loglikes.end());
-        cout << "\r- - - - - - - - - - - - - - - - - -" << endl;
+        cout << "\r----------------------------------------" << endl;
 
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
             out_samples.push_back(
@@ -158,7 +161,8 @@ int main() {
         }
 
 
-        cout << "elapsed time: " << (double)(clock() - start_t)/CLOCKS_PER_SEC << "s" << endl;
+        cout << "iterations: " << it;
+        cout << " (elapsed time: " << (double)(clock() - start_t)/CLOCKS_PER_SEC << "s)" << endl;
 
         double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES] {};
 
@@ -188,6 +192,48 @@ int main() {
 
         cout << "Z: " << Z << endl;
         cout << "logz: " << log(Z) << " +- " << drawn_logZ_std_dev << endl;
+
+
+        cout << "\rfinding neighbours... (" << out_samples.size() << " samples)";
+
+        // connectivity bit.
+        vector<array<int, N_NEIGHBOURS>> min_dists(out_samples.size());
+        for (int i = 0; i < out_samples.size(); ++i) {
+            array<pair<double, int>, N_NEIGHBOURS> curr_min_dists{};
+
+            for (int j = 0; j < out_samples.size(); ++j) {
+                double curr_dist = 0;
+
+                if (i != j) {
+                    for (int k = 0; k < N_SAMPLE_CMPTS; ++k) {
+                        double cmpt = (out_samples[i].data[k] - out_samples[j].data[k]);
+                        curr_dist += cmpt * cmpt;
+                    }
+                    curr_dist = sqrt(curr_dist);
+                } else {
+                    curr_dist = HUGE_VAL;
+                }
+
+                // sorting maintains the largest element at the front
+                if (j >= N_NEIGHBOURS) {
+                    if (j == N_NEIGHBOURS) {
+                        sort(curr_min_dists.begin(), curr_min_dists.end(), dist_cmp);
+                    }
+                    if (curr_dist < curr_min_dists.front().first) {
+                        curr_min_dists.front() = pair<double, int>(curr_dist, j);
+                        sort(curr_min_dists.begin(), curr_min_dists.end(), dist_cmp);
+                    }
+                }
+                else {
+                    curr_min_dists[j].first = curr_dist;
+                    curr_min_dists[j].second = j;
+                }
+            }
+            for (int j = 0; j < N_NEIGHBOURS; ++j) {
+                min_dists[i][j] = curr_min_dists[j].second;
+            }
+        }
+
         cout << "\rwriting to file...";
 
         ofstream outfile;
@@ -196,22 +242,29 @@ int main() {
         for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
             outfile << "cmpt_" << i << ",";
         }
+        for (int i = 0; i < N_NEIGHBOURS; ++i) {
+            outfile << "adj_" << i << ",";
+        }
         outfile << "logl,logv,weight,stepsize,acceptrate,acceptrate_deriv" << endl;
 
-        outfile << scientific << setprecision(12);
+        outfile << scientific << setprecision(10);
 
-        for (auto sample_data : out_samples) {
-            for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-                outfile << sample_data.data_real()[i] << ",";
+        for (int i = 0; i < out_samples.size(); ++i) {
+            for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
+                outfile << out_samples[i].data[j] << ",";
             }
-            outfile << sample_data.logl << "," << sample_data.logv << "," << sample_data.weight
-             << "," << sample_data.stepsize << "," << sample_data.acceptrate
-             << "," << sample_data.acceptrate_deriv << endl;
+            for (int j = 0; j < N_NEIGHBOURS; ++j) {
+                outfile << min_dists[i][j] << ",";
+            }
+            outfile << out_samples[i].logl << "," << out_samples[i].logv << "," << out_samples[i].weight
+                << "," << out_samples[i].stepsize << "," << out_samples[i].acceptrate
+                << "," << out_samples[i].acceptrate_deriv << endl;
         }
 
         outfile.close();
+
         out_samples.clear();
-        cout << "\r-----------------------------------" << endl;
+        cout << "\r----------------------------------------" << endl;
     }
 }
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
