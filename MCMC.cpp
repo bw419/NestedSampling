@@ -151,8 +151,7 @@ bool GalileanMCMC::step(sample_collection &samples, int idx_to_evolve, sample_ve
 
     // try to reflect.
     // v1 = norm here
-    sample_vec v1{};
-    this->grad_loglike_fn_(new_pt, v1);
+    sample_vec v1 = this->grad_loglike_fn_(new_pt);
     normalise_vec(v1);
 
     //cout << "old v: ";

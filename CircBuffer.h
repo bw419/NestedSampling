@@ -1,9 +1,9 @@
-#pragma once
+#ifndef CIRCBUFFER_H
+#define CIRCBUFFER_H
 
 #include "Globals.h"
 
 template <typename T>
-
 class CircularBuffer
 {
     static const size_t EMPTY = ~0u;
@@ -15,9 +15,8 @@ class CircularBuffer
 public:
     std::vector<T> data;
 
-    CircularBuffer(size_t size)
-        : data(size), data_vec_size(size)
-    {}
+    CircularBuffer(size_t size) : data(size), data_vec_size(size) {};
+
 
     bool empty() {
         return head == EMPTY;
@@ -42,3 +41,5 @@ public:
             next = 0;
     }
 };
+
+#endif

@@ -1,4 +1,6 @@
-#pragma once
+#ifndef DISTRIBUTIONS_H
+#define DISTRIBUTIONS_H
+
 #include "Globals.h"
 
 extern default_random_engine rand_gen;
@@ -37,3 +39,5 @@ double gen_prior_elem();
 sample_vec gen_prior();
 bool is_elem_in_prior_range(const double &elem);
 bool is_in_prior_range(const sample_vec &sample);
+
+#endif

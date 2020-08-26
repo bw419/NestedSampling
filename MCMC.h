@@ -1,4 +1,6 @@
-#pragma once
+#ifndef MCMC_H
+#define MCMC_H
+
 #include "Globals.h"
 #include "CircBuffer.h"
 
@@ -67,7 +69,7 @@ public:
 
 class GalileanMCMC : public MCMCWalker {
 
-	void (*grad_loglike_fn_) (const sample_vec&, sample_vec&);
+	sample_vec (*grad_loglike_fn_) (const sample_vec&);
 
 	sample_vec velocity_;
 	double perturbation_theta_; // in radians
@@ -76,7 +78,7 @@ class GalileanMCMC : public MCMCWalker {
 	bool step(sample_collection &samples, int idx_to_write, sample_vec &new_pt, double old_loglike, double& new_loglike);
 
 public:
-	GalileanMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (const sample_vec&), void (*grad_loglike_fn_ptr) (const sample_vec&, sample_vec&),
+	GalileanMCMC(double initial_step_size_guess, double (*loglike_fn_ptr) (const sample_vec&), sample_vec (*grad_loglike_fn_ptr) (const sample_vec&),
 		size_t buffer_size, double target_acceptance_rate, double k_prop, double k_deriv, double perturbation_theta) :
 		MCMCWalker(initial_step_size_guess, loglike_fn_ptr, buffer_size, target_acceptance_rate, k_prop, k_deriv), 
 		velocity_(), grad_loglike_fn_(grad_loglike_fn_ptr), perturbation_theta_(perturbation_theta) {
@@ -85,3 +87,4 @@ public:
 	void evolve(sample_collection &samples, int idx_to_evolve, int idx_to_write, double& min_loglike);
 };
 
+#endif

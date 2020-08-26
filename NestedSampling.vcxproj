@@ -140,6 +140,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CircBuffer.cpp" />
     <ClCompile Include="Distributions.cpp" />
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="MCMC.cpp" />

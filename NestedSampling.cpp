@@ -1,26 +1,24 @@
 #include "NestedSampling.h"
-#include "Distributions.h"
-#include "MCMC.h"
 
 using namespace std;
 
 
 cmplx_vec sample_data::data_cmplx() {
     cmplx_vec data_out{};
-    for (int i = 0; i < N_X_CMPTS; ++i) {
-        data_out[i] = cmplx(data[i], data[N_X_CMPTS + i]);
+    for (int i = 0; i < N_FREE_X_CMPTS; ++i) {
+        data_out[i] = cmplx(data[i], data[N_FREE_X_CMPTS + i]);
     }
     return data_out;
 }
 
 
-vector<double> draw_weight_set(size_t n_samples) {
-    vector<double> weight_set{};
+vector<long double> draw_weight_set(size_t n_samples) {
+    vector<long double> weight_set{};
 
-    double X_i = 1.;
-    double X_prev;
+    long double X_i = 1.;
+    long double X_prev;
 
-    double total = 0;
+    long double total = 0;
 
     for (int i = 0; i < n_samples - N_CONCURRENT_SAMPLES; ++i) {
         X_prev = X_i;
@@ -29,7 +27,7 @@ vector<double> draw_weight_set(size_t n_samples) {
         weight_set.push_back(X_prev - X_i);
     }
 
-    double w_remaining = 0;//X_i / N_CONCURRENT_SAMPLES;
+    long double w_remaining = 0;//X_i / N_CONCURRENT_SAMPLES;
     for (int i = n_samples - N_CONCURRENT_SAMPLES; i < n_samples; ++i) {
         weight_set.push_back(w_remaining);
     }
@@ -53,26 +51,26 @@ vector<sample_data> out_samples;
 int main() {
 
     // loop entire program, ii=filename number
-    for (int file_number = 0; file_number < 1; ++file_number) {
+    for (int file_number = FILE_N_START; file_number < FILE_N_STOP; ++file_number) {
 
         intitialise_phase_reconstruction();
 
         clock_t start_t = clock();
-
+        string termination_reason;
 
         // generate initial points
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
             overwrite_sample(current_samples[i], gen_prior());
             curr_sample_loglikes[i] = loglike_from_sample_vec(current_samples[i]);
         }
-        
 
-        double Z = 0;
-        double X_prev_est = 1;
-        double X_curr_est, w_est;
-        BallWalkMCMC mcmc = BallWalkMCMC(.5, loglike_from_sample_vec, max(10, N_CONCURRENT_SAMPLES), .5, 0.001, 10);
-        //GalileanMCMC mcmc = GalileanMCMC(.5, loglike_from_sample_vec, grad_loglike_from_sample_vec, 
-        //                                 max(10, N_CONCURRENT_SAMPLES), .8, 0.1, 100, 0.2);
+
+        long double Z = 0;
+        long double X_prev_est = 1;
+        long double X_curr_est, w_est;
+        //BallWalkMCMC mcmc = BallWalkMCMC(.1, loglike_from_sample_vec, max(10, N_CONCURRENT_SAMPLES), .5, 0.01, 10);
+        GalileanMCMC mcmc = GalileanMCMC(.1, loglike_from_sample_vec, grad_loglike_from_sample_vec, 
+                                         max(10, N_CONCURRENT_SAMPLES), .8, 0.1, 100, 0.2);
 
         int it = 1;
         for (it = 1; it <= N_ITERATIONS; ++it) {
@@ -86,7 +84,7 @@ int main() {
 
             if (!(it % 100)) {
                 //cout << endl;
-                cout << "\riteration " << it << ", success rate: "  << mcmc.acceptance_rate() << ", step size: " << mcmc.step_size() << ", logz: " << log(Z) << "            ";
+                cout << "\riteration " << it << ", success rate: " << mcmc.acceptance_rate() << ", step size: " << mcmc.step_size() << ", logz: " << log(Z) << "            ";
                 //cout << endl;
             }
 
@@ -94,8 +92,8 @@ int main() {
             int min_L_idx = (min_L_it - curr_sample_loglikes.begin());
 
             //cout << "min idx: " << min_L_idx << endl;
-
-            X_curr_est = exp(-(double)it / N_CONCURRENT_SAMPLES);
+               
+            X_curr_est = exp(-(long double)it / N_CONCURRENT_SAMPLES);
             w_est = X_prev_est - X_curr_est;
             Z += exp(*min_L_it) * w_est;
 
@@ -113,9 +111,9 @@ int main() {
             //cout << "before... " << start_pt_idx << " , " << current_samples[start_pt_idx][0] << ", " << *min_L_it << endl;
             //cout << "start idx: " << start_pt_idx << ", min L idx: " << min_L_idx << endl;
             mcmc.evolve(current_samples, start_pt_idx, min_L_idx, *min_L_it);
-            
 
-            X_prev_est = exp(-(double)it / N_CONCURRENT_SAMPLES);
+
+            X_prev_est = exp(-(long double)it / N_CONCURRENT_SAMPLES);
 
             //cout << "after..." << current_samples[min_L_idx][0] << ", " << *min_L_it << endl;
             //cout << "-------------------------------" << endl;
@@ -126,50 +124,56 @@ int main() {
             //cout << "~~~" << endl;
 
             if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
-                ++it;
-                cout << "\rTerminated (evidence accumulation percentage), Z: " << Z << "                                               ";
+                termination_reason = "evidence accumulation percentage";
                 break;
             }
             if (mcmc.step_size() < TERMINATION_STEPSIZE) {
-                ++it;
-                cout << "\rTerminated (step size), Z: " << Z << "                                                 ";
+                termination_reason = "step size";
                 break;
             }
             if (it == N_ITERATIONS - 1) {
-                ++it;
-                cout << "\rTerminated (max iterations), Z: " << Z << "                                               ";
+                termination_reason = "max iterations";
+                break;
             }
         }
-
-
+        cout << "\rTerminated (" << termination_reason << "), Z: " << Z << "                                               ";
         cout << endl;
-        w_est = (exp(-(double)(it) / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
-        cout << "\rsorting remaining points...";
-        sort(curr_sample_loglikes.begin(), curr_sample_loglikes.end());
-        cout << "\r----------------------------------------" << endl;
 
-        for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
-            out_samples.push_back(
-                sample_data(
-                    current_samples[i],
-                    curr_sample_loglikes[i], log(w_est),
-                    mcmc.step_size(), mcmc.acceptance_rate(),
-                    mcmc.acceptance_rate_deriv()
-                )
-            );
-            Z += exp(curr_sample_loglikes[i]) * w_est;
+        if (USE_REMAINING_SAMPLES) {
+            cout << "\rsorting remaining points...";
+            w_est = (exp(-(long double)(it) / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
+
+            array<pair<double, sample_vec>, N_CONCURRENT_SAMPLES> remaining{};
+            for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
+                remaining[i].first = curr_sample_loglikes[i];
+                remaining[i].second = current_samples[i];
+            }
+            sort(remaining.begin(), remaining.end());
+
+            cout << "\r----------------------------------------" << endl;
+
+            for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
+                out_samples.push_back(
+                    sample_data(
+                        remaining[i].second,
+                        remaining[i].first, log(w_est),
+                        mcmc.step_size(), mcmc.acceptance_rate(),
+                        mcmc.acceptance_rate_deriv()
+                    )
+                );
+                Z += exp(curr_sample_loglikes[i]) * w_est;
+            }
         }
-
-
         cout << "iterations: " << it;
         cout << " (elapsed time: " << (double)(clock() - start_t)/CLOCKS_PER_SEC << "s)" << endl;
 
-        double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES] {};
 
-        double acc_drawn_logZ = 0;
+        long double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES] {};
+
+        long double acc_drawn_logZ = 0;
         for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
-            double drawn_Z = 0;
-            vector<double> drawn_weight_set = draw_weight_set(out_samples.size());
+            long double drawn_Z = 0;
+            vector<long double> drawn_weight_set = draw_weight_set(out_samples.size());
 
 
             for (int j = 0; j < out_samples.size(); ++j) {
@@ -180,71 +184,91 @@ int main() {
             acc_drawn_logZ += alternative_logZ_vals[i];
         }
 
-        double drawn_logZ_mean = acc_drawn_logZ / N_ALTERNATIVE_WEIGHT_SAMPLES;
-        double drawn_logZ_variance = 0;
+        long double drawn_logZ_mean = acc_drawn_logZ / N_ALTERNATIVE_WEIGHT_SAMPLES;
+        long double drawn_logZ_variance = 0;
         for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
-            double delta = alternative_logZ_vals[i] - drawn_logZ_mean;
+            long double delta = alternative_logZ_vals[i] - drawn_logZ_mean;
             drawn_logZ_variance += delta * delta;
         }
         drawn_logZ_variance /= (N_ALTERNATIVE_WEIGHT_SAMPLES-1);
-        double drawn_logZ_std_dev = sqrt(drawn_logZ_variance);
+        long double drawn_logZ_std_dev = sqrt(drawn_logZ_variance);
 
 
         cout << "Z: " << Z << endl;
         cout << "logz: " << log(Z) << " +- " << drawn_logZ_std_dev << endl;
 
 
-        cout << "\rfinding neighbours... (" << out_samples.size() << " samples)";
-
-        // connectivity bit.
         vector<array<int, N_NEIGHBOURS>> min_dists(out_samples.size());
-        for (int i = 0; i < out_samples.size(); ++i) {
-            array<pair<double, int>, N_NEIGHBOURS> curr_min_dists{};
+        if (COMPUTE_NEIGHBOURS) {
+            cout << "\rfinding neighbours... (" << out_samples.size() << " samples)";
+            start_t = clock();
 
-            for (int j = 0; j < out_samples.size(); ++j) {
-                double curr_dist = 0;
+            // connectivity bit.
+            for (int i = 0; i < out_samples.size(); ++i) {
+                array<pair<double, int>, N_NEIGHBOURS> curr_min_dists{};
 
-                if (i != j) {
-                    for (int k = 0; k < N_SAMPLE_CMPTS; ++k) {
-                        double cmpt = (out_samples[i].data[k] - out_samples[j].data[k]);
-                        curr_dist += cmpt * cmpt;
+                for (int j = 0; j < out_samples.size(); ++j) {
+                    double curr_dist = 0;
+
+                    if (i != j) {
+                        for (int k = 0; k < N_SAMPLE_CMPTS; ++k) {
+                            double cmpt = (out_samples[i].data[k] - out_samples[j].data[k]);
+                            curr_dist += cmpt * cmpt;
+                        }
+                        curr_dist = sqrt(curr_dist);
                     }
-                    curr_dist = sqrt(curr_dist);
-                } else {
-                    curr_dist = HUGE_VAL;
+                    else {
+                        curr_dist = HUGE_VAL;
+                    }
+
+                    // sorting maintains the largest element at the front
+                    if (j >= N_NEIGHBOURS) {
+                        if (j == N_NEIGHBOURS) {
+                            sort(curr_min_dists.begin(), curr_min_dists.end(), dist_cmp);
+                        }
+                        if (curr_dist < curr_min_dists.front().first) {
+                            curr_min_dists.front() = pair<double, int>(curr_dist, j);
+                            sort(curr_min_dists.begin(), curr_min_dists.end(), dist_cmp);
+                        }
+                    }
+                    else {
+                        curr_min_dists[j].first = curr_dist;
+                        curr_min_dists[j].second = j;
+                    }
                 }
-
-                // sorting maintains the largest element at the front
-                if (j >= N_NEIGHBOURS) {
-                    if (j == N_NEIGHBOURS) {
-                        sort(curr_min_dists.begin(), curr_min_dists.end(), dist_cmp);
-                    }
-                    if (curr_dist < curr_min_dists.front().first) {
-                        curr_min_dists.front() = pair<double, int>(curr_dist, j);
-                        sort(curr_min_dists.begin(), curr_min_dists.end(), dist_cmp);
-                    }
-                }
-                else {
-                    curr_min_dists[j].first = curr_dist;
-                    curr_min_dists[j].second = j;
+                for (int j = 0; j < N_NEIGHBOURS; ++j) {
+                    min_dists[i][j] = curr_min_dists[j].second;
                 }
             }
-            for (int j = 0; j < N_NEIGHBOURS; ++j) {
-                min_dists[i][j] = curr_min_dists[j].second;
-            }
+            cout << "\relapsed time: " << (double)(clock() - start_t) / CLOCKS_PER_SEC << "s                            " << endl;
         }
+
 
         cout << "\rwriting to file...";
 
         ofstream outfile;
         outfile.open(OUT_PATH + to_string(file_number) + ".txt");
 
+        for (int j = 1; j < N_FREE_X_CMPTS+1; ++j) {
+            outfile << actual_x[j].real() << ",";
+        }
+        for (int j = 1; j < N_FREE_X_CMPTS+1; ++j) {
+            outfile << actual_x[j].imag();
+            if (j < N_FREE_X_CMPTS) {
+                outfile << ",";
+            }
+        }
+        outfile << ";" << N_IMAGE_CMPTS << ";" << endl;
+
         for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
             outfile << "cmpt_" << i << ",";
         }
-        for (int i = 0; i < N_NEIGHBOURS; ++i) {
-            outfile << "adj_" << i << ",";
+        if (COMPUTE_NEIGHBOURS) {
+            for (int i = 0; i < N_NEIGHBOURS; ++i) {
+                outfile << "adj_" << i << ",";
+            }
         }
+
         outfile << "logl,logv,weight,stepsize,acceptrate,acceptrate_deriv" << endl;
 
         outfile << scientific << setprecision(10);
@@ -253,8 +277,10 @@ int main() {
             for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
                 outfile << out_samples[i].data[j] << ",";
             }
-            for (int j = 0; j < N_NEIGHBOURS; ++j) {
-                outfile << min_dists[i][j] << ",";
+            if (COMPUTE_NEIGHBOURS) {
+                for (int j = 0; j < N_NEIGHBOURS; ++j) {
+                    outfile << min_dists[i][j] << ",";
+                }
             }
             outfile << out_samples[i].logl << "," << out_samples[i].logv << "," << out_samples[i].weight
                 << "," << out_samples[i].stepsize << "," << out_samples[i].acceptrate
