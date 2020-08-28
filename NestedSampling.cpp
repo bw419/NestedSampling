@@ -58,7 +58,7 @@ void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x
     for (int j = 0; j < N_IMAGE_CMPTS; ++j) {
         for (int k = 0; k < N_FREE_X_CMPTS + 1; ++k) {
             outfile << transform_mat[j][k].real();
-            if (!(j == N_IMAGE_CMPTS - 1) && (k == N_FREE_X_CMPTS)) {
+            if (!((j == N_IMAGE_CMPTS - 1) && (k == N_FREE_X_CMPTS))) {
                 outfile << ",";
             }
         }
@@ -67,15 +67,15 @@ void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x
     for (int j = 0; j < N_IMAGE_CMPTS; ++j) {
         for (int k = 0; k < N_FREE_X_CMPTS + 1; ++k) {
             outfile << transform_mat[j][k].imag();
-            if (!(j == N_IMAGE_CMPTS - 1) && (k == N_FREE_X_CMPTS)) {
+            if (!((j == N_IMAGE_CMPTS - 1) && (k == N_FREE_X_CMPTS))) {
                 outfile << ",";
             }
         }
     }
-
-    outfile << "n_image_cmpts=" << N_IMAGE_CMPTS << ";" << endl;
-    outfile << "sampling_time=" << sampling_time << ";" << endl;
-    outfile << "neighbour_computing_time=" << neighbour_computing_time << ";" << endl;
+    outfile << ";";
+    outfile << "n_image_cmpts=" << N_IMAGE_CMPTS << ";";
+    outfile << "sampling_time=" << sampling_time << ";";
+    outfile << "neighbour_computing_time=" << neighbour_computing_time << ";";
 }
 
 void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_samples, 

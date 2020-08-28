@@ -43,7 +43,7 @@ void intitialise_phase_reconstruction() {
                 }
             }
             else {
-                transform_mat[i][j] = 1;// gen_circular_gaussian();
+                transform_mat[i][j] = gen_circular_gaussian();
             }
         }
     }
