@@ -10,7 +10,7 @@ uniform_int_distribution<int> uniform_rand_sample(0, N_CONCURRENT_SAMPLES - 1);
 normal_distribution<double> uniform_circ(0, INV_SQRT_2);
 
 // prepended with an extra 1 + 0j for a single solution.
-cmplx_vec_prepended actual_x{ {} };//, { 1, 0 }, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
+cmplx_vec_prepended actual_x{ };//, { 1, 0 }, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
 image_vec observed_y = { {} };
 
 cmplx gen_circular_gaussian() {
@@ -31,7 +31,6 @@ sample_vec grad_loglike_from_sample_vec(const sample_vec& p) {
 }
 
 
-typedef array<array<cmplx, N_FREE_X_CMPTS + 1>, N_IMAGE_CMPTS> t_mat;
 t_mat transform_mat{};
 void intitialise_phase_reconstruction() {
     cout << scientific << setprecision(2);
@@ -44,7 +43,7 @@ void intitialise_phase_reconstruction() {
                 }
             }
             else {
-                transform_mat[i][j] = gen_circular_gaussian();
+                transform_mat[i][j] = 1;// gen_circular_gaussian();
             }
         }
     }
@@ -57,13 +56,19 @@ void intitialise_phase_reconstruction() {
     //    cout << endl;
     //}
 
-    cout << "actual x: " << cmplx(1, 0) << " | ";;
     actual_x[0] = cmplx(1, 0);
     for (int i = 1; i < N_FREE_X_CMPTS + 1; ++i) {
-        actual_x[i] = gen_circular_gaussian();
-        cout << actual_x[i] << " | ";
+        actual_x[i] = cmplx(-.4, .8);// gen_circular_gaussian();
     }
-    cout << endl;
+
+    if (LOG_PROGRESS) {
+        cout << "actual x: " << cmplx(1, 0) << " | ";;
+
+        for (int i = 1; i < N_FREE_X_CMPTS + 1; ++i) {
+            cout << actual_x[i] << " | ";
+        }
+        cout << endl;
+    }
 
 
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
@@ -73,7 +78,6 @@ void intitialise_phase_reconstruction() {
         }
         observed_y[i] = abs(sum);
     }
-    cout << endl;
 }
 
 

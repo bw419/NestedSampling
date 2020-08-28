@@ -10,8 +10,11 @@ extern normal_distribution<double> uniform_circ;
 extern uniform_int_distribution<int> uniform_rand_sample;
 cmplx gen_circular_gaussian();
 
+typedef array<array<cmplx, N_FREE_X_CMPTS + 1>, N_IMAGE_CMPTS> t_mat;
+extern t_mat transform_mat;
 extern cmplx_vec_prepended actual_x;
 extern image_vec observed_y;
+
 
 
 double loglike_from_sample_vec(const sample_vec &p);
