@@ -16,25 +16,26 @@
 #include <array>
 
 
-#define OUT_PATH "out/samples"
-#define LOG_PROGRESS false
+#define OUT_PATH "out/samples_11_"
+#define LOG_PROGRESS true
+#define LOG_PROGRESS_VERBOSE false
 
 #define FILE_N_START 0
-#define FILE_N_STOP 1
+#define FILE_N_STOP 3
 #define USE_REMAINING_SAMPLES true
 
 
-#define N_CONCURRENT_SAMPLES 100
-#define N_FREE_X_CMPTS 9
+#define N_CONCURRENT_SAMPLES 1000
+#define N_FREE_X_CMPTS 49
 #define N_SAMPLE_CMPTS 2*N_FREE_X_CMPTS
-#define N_IMAGE_CMPTS 32
+#define N_IMAGE_CMPTS 209
 #define N_STEPS_PER_SAMPLE 50
-#define N_ITERATIONS 100000
-#define TERMINATION_PERCENTAGE 1e-06
+#define N_ITERATIONS 1000000
+#define TERMINATION_PERCENTAGE 1e-08
 #define TERMINATION_STEPSIZE 1e-06
 #define N_ALTERNATIVE_WEIGHT_SAMPLES 20
 
-#define COMPUTE_NEIGHBOURS true
+#define COMPUTE_NEIGHBOURS false
 #define N_NEIGHBOURS 10
 
 
@@ -42,7 +43,7 @@ using namespace std;
 typedef complex<double> cmplx;
 typedef array<double, N_SAMPLE_CMPTS> sample_vec;
 typedef array<double, N_IMAGE_CMPTS> image_vec;
-typedef array<sample_vec, N_CONCURRENT_SAMPLES> sample_collection;
+typedef vector<sample_vec> sample_collection;
 typedef array<cmplx, N_FREE_X_CMPTS> cmplx_vec;
 typedef array<cmplx, N_FREE_X_CMPTS + 1> cmplx_vec_prepended;
 

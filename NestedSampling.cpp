@@ -41,7 +41,7 @@ bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
     return p1.first > p2.first;
 }
 
-void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x, const t_mat &transform_mat,
+void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x, const vector<vector<cmplx>> &transform_mat,
     const string &termination_reason, const double &sampling_time, const double &neighbour_computing_time) {
     outfile << "actual_x_cmpts=";
     for (int j = 1; j < N_FREE_X_CMPTS + 1; ++j) {
@@ -79,7 +79,7 @@ void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x
 }
 
 void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_samples, 
-    const vector<array<int, N_NEIGHBOURS>> &min_dists) {
+    const vector<vector<int>> &min_dists) {
 
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
         outfile << "cmpt_" << i << ",";
@@ -142,14 +142,15 @@ double compute_logZ_uncertainty(const vector<sample_data>& out_samples) {
 
 
 void compute_neighbours(const vector<sample_data>& out_samples,
-    vector<array<int, N_NEIGHBOURS>>& min_dists_container_to_write) {
+    vector<vector<int>>& min_dists_container_to_write) {
     if (LOG_PROGRESS) {
         cout << "finding neighbours... (" << out_samples.size() << " samples)" << endl;
     }
 
     // connectivity bit.
     for (int i = 0; i < out_samples.size(); ++i) {
-        array<pair<double, int>, N_NEIGHBOURS> curr_min_dists{};
+        vector<pair<double, int>> curr_min_dists{};
+        curr_min_dists.resize(N_NEIGHBOURS);
 
         for (int j = 0; j < out_samples.size(); ++j) {
             double curr_dist = 0;
@@ -180,6 +181,7 @@ void compute_neighbours(const vector<sample_data>& out_samples,
                 curr_min_dists[j].second = j;
             }
         }
+        min_dists_container_to_write[i].resize(N_NEIGHBOURS);
         for (int j = 0; j < N_NEIGHBOURS; ++j) {
             min_dists_container_to_write[i][j] = curr_min_dists[j].second;
         }
@@ -203,14 +205,17 @@ void compute_neighbours(const vector<sample_data>& out_samples,
 
 
 sample_collection current_samples{};
-array<double, N_CONCURRENT_SAMPLES> curr_sample_loglikes{};
-vector<sample_data> out_samples;
-vector<array<int, N_NEIGHBOURS>> min_dists{};
+vector<double> curr_sample_loglikes{};
+vector<sample_data> out_samples{};
+vector<vector<int>> min_dists{};
 
 
 int main() {
+    
+    current_samples.resize(N_CONCURRENT_SAMPLES);
+    curr_sample_loglikes.resize(N_CONCURRENT_SAMPLES);
 
-    if (LOG_PROGRESS) {
+    if (LOG_PROGRESS_VERBOSE) {
         cout << "Files: start " << FILE_N_START << ", end " << FILE_N_STOP << endl;
     }
 
@@ -235,7 +240,7 @@ int main() {
         long double Z = 0;
         long double X_prev_est = 1;
         long double X_curr_est, w_est;
-        BallWalkMCMC mcmc = BallWalkMCMC(.1, loglike_from_sample_vec, max(10, N_CONCURRENT_SAMPLES), .5, 0.01, 10);
+        BallWalkMCMC mcmc = BallWalkMCMC(.1, loglike_from_sample_vec, max(10, N_CONCURRENT_SAMPLES), .5, 0.01, 100);
         //GalileanMCMC mcmc = GalileanMCMC(.1, loglike_from_sample_vec, grad_loglike_from_sample_vec, 
         //                                 max(10, N_CONCURRENT_SAMPLES), .8, 0.1, 100, 0.2);
 
@@ -249,7 +254,7 @@ int main() {
             //cout << "rate, " << mcmc.acceptance_rate() << " | step size, " << mcmc.step_size() << endl;
             //cout << "---------------------------------------------" << endl;
 
-            if (!(it % 200) && LOG_PROGRESS) {
+            if (!(it % 500) && LOG_PROGRESS_VERBOSE) {
                 cout << "iteration " << it << ", success rate: " << mcmc.acceptance_rate()
                     << ", step size: " << mcmc.step_size() << ", logz: " << log(Z) << endl;
             }
@@ -304,25 +309,26 @@ int main() {
         }
 
         if (LOG_PROGRESS) {
-            cout << "Terminated (" << termination_reason << "), Z: " << Z << endl;
+            cout << "Terminated (" << termination_reason << "), logZ: " << log(Z) << endl;
         }
 
 
         if (USE_REMAINING_SAMPLES) {
-            if (LOG_PROGRESS) {
+            if (LOG_PROGRESS_VERBOSE) {
                 cout << "sorting remaining points..." << endl;
             }
 
             w_est = (exp(-(long double)(it) / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
 
-            array<pair<double, sample_vec>, N_CONCURRENT_SAMPLES> remaining{};
+            vector<pair<double, sample_vec>> remaining{};
+            remaining.resize(N_CONCURRENT_SAMPLES);
             for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
                 remaining[i].first = curr_sample_loglikes[i];
                 remaining[i].second = current_samples[i];
             }
             sort(remaining.begin(), remaining.end());
 
-            if (LOG_PROGRESS) {
+            if (LOG_PROGRESS_VERBOSE) {
                 cout << "----------------------------------------" << endl;
             }
 
@@ -343,7 +349,7 @@ int main() {
         sampling_time = (double)(clock() - start_t) / CLOCKS_PER_SEC;
         long double drawn_logZ_std_dev = compute_logZ_uncertainty(out_samples);
 
-        if (LOG_PROGRESS) {
+        if (LOG_PROGRESS_VERBOSE) {
             cout << "iterations: " << it << endl;
             cout << "sampling time : " << sampling_time << "s)" << endl;
             cout << "Z: " << Z << endl;
@@ -357,13 +363,13 @@ int main() {
             min_dists.resize(out_samples.size());
             compute_neighbours(out_samples, min_dists);
             neighbour_computing_time = (double)(clock() - start_t) / CLOCKS_PER_SEC;
-            if (LOG_PROGRESS) {
+            if (LOG_PROGRESS_VERBOSE) {
                 cout << "elapsed neighbour computing time: " << neighbour_computing_time << "s" << endl;
             }
         }
 
 
-        if (LOG_PROGRESS) {
+        if (LOG_PROGRESS_VERBOSE) {
             cout << "writing to file..." << endl;
         }
 
@@ -379,7 +385,7 @@ int main() {
         out_samples.clear();
         min_dists.clear();
 
-        if (LOG_PROGRESS) {
+        if (LOG_PROGRESS_VERBOSE) {
             cout << "----------------------------------------" << endl;
         }
     }

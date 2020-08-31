@@ -31,11 +31,14 @@ sample_vec grad_loglike_from_sample_vec(const sample_vec& p) {
 }
 
 
-t_mat transform_mat{};
+vector<vector<cmplx>> transform_mat{};
 void intitialise_phase_reconstruction() {
     cout << scientific << setprecision(2);
+    transform_mat.resize(N_IMAGE_CMPTS);
 
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
+        transform_mat[i].resize(N_FREE_X_CMPTS + 1);
+
         for (int j = 0; j < N_FREE_X_CMPTS + 1; ++j) {
             if (i < N_FREE_X_CMPTS + 1) {
                 if (i == j) {
@@ -58,12 +61,11 @@ void intitialise_phase_reconstruction() {
 
     actual_x[0] = cmplx(1, 0);
     for (int i = 1; i < N_FREE_X_CMPTS + 1; ++i) {
-        actual_x[i] = cmplx(-.4, .8);// gen_circular_gaussian();
+        actual_x[i] = gen_circular_gaussian(); //cmplx(-.4, .8);
     }
 
-    if (LOG_PROGRESS) {
-        cout << "actual x: " << cmplx(1, 0) << " | ";;
-
+    if (LOG_PROGRESS_VERBOSE) {
+        cout << "actual x: " << cmplx(1, 0) << " | ";
         for (int i = 1; i < N_FREE_X_CMPTS + 1; ++i) {
             cout << actual_x[i] << " | ";
         }

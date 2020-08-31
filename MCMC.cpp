@@ -12,7 +12,7 @@ void MCMCWalker::adjust_step_size() {
         // -> decrease step rate = initial size * e^(-step constant)
         double rate_error = calculate_acceptance_rate(false) - target_acceptance_rate_;
         double adjust_amount = k_prop_ * rate_error + k_deriv_ * acceptance_rate_deriv_;
-        double thresh = 1 ;
+        double thresh = 10;
         if (abs(adjust_amount) > thresh) {
             //cout << "too much adjustment " << adjust_amount << "  " << adjust_amount / abs(adjust_amount);
             step_constant_ += thresh * adjust_amount/abs(adjust_amount);
