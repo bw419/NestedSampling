@@ -42,6 +42,7 @@ bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
 }
 
 void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x, const vector<vector<cmplx>> &transform_mat,
+    const double &logZ, const double &logZ_std_dev,
     const string &termination_reason, const double &sampling_time, const double &neighbour_computing_time) {
     outfile << "actual_x_cmpts=";
     for (int j = 1; j < N_FREE_X_CMPTS + 1; ++j) {
@@ -73,6 +74,8 @@ void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x
         }
     }
     outfile << ";";
+    outfile << "logZ=" << logZ << ";";
+    outfile << "logZ_std_dev=" << logZ_std_dev << ";";
     outfile << "n_image_cmpts=" << N_IMAGE_CMPTS << ";";
     outfile << "sampling_time=" << sampling_time << ";";
     outfile << "neighbour_computing_time=" << neighbour_computing_time << ";";
@@ -240,9 +243,18 @@ int main() {
         long double Z = 0;
         long double X_prev_est = 1;
         long double X_curr_est, w_est;
-        BallWalkMCMC mcmc = BallWalkMCMC(.1, loglike_from_sample_vec, max(10, N_CONCURRENT_SAMPLES), .5, 0.01, 100);
-        //GalileanMCMC mcmc = GalileanMCMC(.1, loglike_from_sample_vec, grad_loglike_from_sample_vec, 
-        //                                 max(10, N_CONCURRENT_SAMPLES), .8, 0.1, 100, 0.2);
+
+        unique_ptr<MCMCWalker> mcmc;
+        if (POLYMORPHIC_MCMC && POLYMORPHIC_TRANSITION_FILE_N < 5) {
+            mcmc = unique_ptr<MCMCWalker>(
+                new BallWalkMCMC(.1, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.01, 100));
+        }
+        else {
+            mcmc = unique_ptr<MCMCWalker>(
+                new GalileanMCMC(.1, loglike_from_sample_vec, grad_loglike_from_sample_vec,
+                                  N_CONCURRENT_SAMPLES, .8, 0.1, 100, 0.2));
+        }
+
 
         int it = 1;
         for (it = 1; it <= N_ITERATIONS; ++it) {
@@ -251,12 +263,12 @@ int main() {
             //    cout << curr_sample_loglikes[j] << " | ";
             //}
             //cout << endl;
-            //cout << "rate, " << mcmc.acceptance_rate() << " | step size, " << mcmc.step_size() << endl;
+            //cout << "rate, " << mcmc->acceptance_rate() << " | step size, " << mcmc->step_size() << endl;
             //cout << "---------------------------------------------" << endl;
 
             if (!(it % 500) && LOG_PROGRESS_VERBOSE) {
-                cout << "iteration " << it << ", success rate: " << mcmc.acceptance_rate()
-                    << ", step size: " << mcmc.step_size() << ", logz: " << log(Z) << endl;
+                cout << "iteration " << it << ", success rate: " << mcmc->acceptance_rate()
+                    << ", step size: " << mcmc->step_size() << ", logz: " << log(Z) << endl;
             }
 
             auto min_L_it = min_element(curr_sample_loglikes.begin(), curr_sample_loglikes.end());
@@ -272,8 +284,8 @@ int main() {
                 sample_data(
                     current_samples[min_L_idx],
                     *min_L_it, log(w_est),
-                    mcmc.step_size(), mcmc.acceptance_rate(),
-                    mcmc.acceptance_rate_deriv()
+                    mcmc->step_size(), mcmc->acceptance_rate(),
+                    mcmc->acceptance_rate_deriv()
                 )
             );
 
@@ -281,7 +293,7 @@ int main() {
 
             //cout << "before... " << start_pt_idx << " , " << current_samples[start_pt_idx][0] << ", " << *min_L_it << endl;
             //cout << "start idx: " << start_pt_idx << ", min L idx: " << min_L_idx << endl;
-            mcmc.evolve(current_samples, start_pt_idx, min_L_idx, *min_L_it);
+            mcmc->evolve(current_samples, start_pt_idx, min_L_idx, *min_L_it);
 
 
             X_prev_est = exp(-(long double)it / N_CONCURRENT_SAMPLES);
@@ -291,14 +303,14 @@ int main() {
 
 
             //cout << "~~~" << endl;
-            //mcmc.acceptance_rate();
+            //mcmc->acceptance_rate();
             //cout << "~~~" << endl;
 
             if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
                 termination_reason = "evidence accumulation percentage";
                 break;
             }
-            if (mcmc.step_size() < TERMINATION_STEPSIZE) {
+            if (mcmc->step_size() < TERMINATION_STEPSIZE) {
                 termination_reason = "step size";
                 break;
             }
@@ -337,8 +349,8 @@ int main() {
                     sample_data(
                         remaining[i].second,
                         remaining[i].first, log(w_est),
-                        mcmc.step_size(), mcmc.acceptance_rate(),
-                        mcmc.acceptance_rate_deriv()
+                        mcmc->step_size(), mcmc->acceptance_rate(),
+                        mcmc->acceptance_rate_deriv()
                     )
                 );
                 Z += exp(curr_sample_loglikes[i]) * w_est;
@@ -376,14 +388,14 @@ int main() {
         ofstream outfile;
         outfile.open(OUT_PATH + to_string(file_number) + ".txt");
 
-        write_outfile_header(outfile, actual_x, transform_mat, termination_reason, sampling_time, neighbour_computing_time);
+        write_outfile_header(outfile, actual_x, transform_mat, log(Z), drawn_logZ_std_dev, termination_reason, sampling_time, neighbour_computing_time);
         write_outfile_body(outfile, out_samples, min_dists);
 
         outfile.close();
 
-
         out_samples.clear();
         min_dists.clear();
+
 
         if (LOG_PROGRESS_VERBOSE) {
             cout << "----------------------------------------" << endl;
