@@ -143,7 +143,6 @@ bool GalileanMCMC::step(sample_collection &samples, int idx_to_evolve, sample_ve
     //cout << "new_loglike: " << new_loglike << ", old: " << this->loglike_fn_(samples + idx_to_evolve) << ", step size: " << step << endl;
 
     if (new_loglike > min_loglike && is_in_prior_range(new_pt)) {
-        ++curr_walk_successes_;
         return true;
     }
 
@@ -228,11 +227,12 @@ void GalileanMCMC::evolve(sample_collection &samples, int idx_to_evolve, int idx
 
         step_accepted = step(samples, idx_to_write, next_pt, loglike_thresh, next_loglike);
 
-        if (curr_step_number_ % 10 == 0) {
+        if (curr_step_number_ % N_STEPS_PER_SAMPLE/10 == 0) {
             perturb_velocity();
         }
 
         if (step_accepted) {
+            ++curr_walk_successes_;
             // move the new point into old_pt as the origin of next ball walk step
             overwrite_sample(samples[idx_to_write], next_pt);
             min_pt_loglike = next_loglike;

@@ -16,19 +16,19 @@
 #include <array>
 
 
-#define OUT_PATH "out/samples_98_"
+#define OUT_PATH "out/samples_95_"
 #define LOG_PROGRESS true
 #define LOG_PROGRESS_VERBOSE false
 
 #define FILE_N_START 0
-#define FILE_N_STOP 20
+#define FILE_N_STOP 10
 #define USE_REMAINING_SAMPLES true
 
 
-#define N_CONCURRENT_SAMPLES 1000
-#define N_FREE_X_CMPTS 3
+#define N_CONCURRENT_SAMPLES 50
+#define N_FREE_X_CMPTS 19
 #define N_SAMPLE_CMPTS 2*N_FREE_X_CMPTS
-#define N_IMAGE_CMPTS 16
+#define N_IMAGE_CMPTS 80
 #define N_STEPS_PER_SAMPLE 50
 #define N_ITERATIONS 1000000
 #define TERMINATION_PERCENTAGE 1e-08
@@ -39,7 +39,7 @@
 #define N_NEIGHBOURS 10
 
 
-#define POLYMORPHIC_MCMC true
+#define POLYMORPHIC_MCMC false
 #define POLYMORPHIC_TRANSITION_FILE_N 5
 
 using namespace std;

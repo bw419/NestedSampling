@@ -12,13 +12,13 @@ cmplx_vec sample_data::data_cmplx() {
 }
 
 
-vector<long double> draw_weight_set(size_t n_samples) {
-    vector<long double> weight_set{};
+vector<double> draw_weight_set(size_t n_samples) {
+    vector<double> weight_set{};
 
-    long double X_i = 1.;
-    long double X_prev;
+    double X_i = 1.;
+    double X_prev;
 
-    long double total = 0;
+    double total = 0;
 
     for (int i = 0; i < n_samples - N_CONCURRENT_SAMPLES; ++i) {
         X_prev = X_i;
@@ -27,7 +27,7 @@ vector<long double> draw_weight_set(size_t n_samples) {
         weight_set.push_back(X_prev - X_i);
     }
 
-    long double w_remaining = 0;//X_i / N_CONCURRENT_SAMPLES;
+    double w_remaining = 0;//X_i / N_CONCURRENT_SAMPLES;
     for (int i = n_samples - N_CONCURRENT_SAMPLES; i < n_samples; ++i) {
         weight_set.push_back(w_remaining);
     }
@@ -116,12 +116,12 @@ void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_sample
 
 double compute_logZ_uncertainty(const vector<sample_data>& out_samples) {
 
-    long double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES]{};
-    long double acc_drawn_logZ = 0;
+    double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES]{};
+    double acc_drawn_logZ = 0;
 
     for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
-        long double drawn_Z = 0;
-        vector<long double> drawn_weight_set = draw_weight_set(out_samples.size());
+        double drawn_Z = 0;
+        vector<double> drawn_weight_set = draw_weight_set(out_samples.size());
 
 
         for (int j = 0; j < out_samples.size(); ++j) {
@@ -132,10 +132,10 @@ double compute_logZ_uncertainty(const vector<sample_data>& out_samples) {
         acc_drawn_logZ += alternative_logZ_vals[i];
     }
 
-    long double drawn_logZ_mean = acc_drawn_logZ / N_ALTERNATIVE_WEIGHT_SAMPLES;
-    long double drawn_logZ_variance = 0;
+    double drawn_logZ_mean = acc_drawn_logZ / N_ALTERNATIVE_WEIGHT_SAMPLES;
+    double drawn_logZ_variance = 0;
     for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
-        long double delta = alternative_logZ_vals[i] - drawn_logZ_mean;
+        double delta = alternative_logZ_vals[i] - drawn_logZ_mean;
         drawn_logZ_variance += delta * delta;
     }
     drawn_logZ_variance /= (N_ALTERNATIVE_WEIGHT_SAMPLES - 1);
@@ -217,6 +217,7 @@ int main() {
     
     current_samples.resize(N_CONCURRENT_SAMPLES);
     curr_sample_loglikes.resize(N_CONCURRENT_SAMPLES);
+    out_samples.reserve(N_ITERATIONS + N_CONCURRENT_SAMPLES);
 
     if (LOG_PROGRESS_VERBOSE) {
         cout << "Files: start " << FILE_N_START << ", end " << FILE_N_STOP << endl;
@@ -227,7 +228,6 @@ int main() {
 
         intitialise_phase_reconstruction();
 
-        clock_t start_t = clock();
         string termination_reason;
         double sampling_time;
         double neighbour_computing_time;
@@ -240,23 +240,27 @@ int main() {
         }
 
 
-        long double Z = 0;
-        long double X_prev_est = 1;
-        long double X_curr_est, w_est;
+        double Z = 0;
+        double X_prev_est = 1;
+        double X_curr_est, w_est;
 
         unique_ptr<MCMCWalker> mcmc;
-        if (POLYMORPHIC_MCMC && POLYMORPHIC_TRANSITION_FILE_N < 5) {
+        if (POLYMORPHIC_MCMC && file_number < POLYMORPHIC_TRANSITION_FILE_N) {
             mcmc = unique_ptr<MCMCWalker>(
-                new BallWalkMCMC(.1, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.01, 100));
+                new GalileanMCMC(.1, loglike_from_sample_vec, grad_loglike_from_sample_vec,
+                    N_CONCURRENT_SAMPLES, .5, 0.1, 100, 0.1));
+            cout << "[galilean] ";
         }
         else {
             mcmc = unique_ptr<MCMCWalker>(
-                new GalileanMCMC(.1, loglike_from_sample_vec, grad_loglike_from_sample_vec,
-                                  N_CONCURRENT_SAMPLES, .8, 0.1, 100, 0.2));
+                new BallWalkMCMC(.1, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.01, 100));
+            cout << "[ball walk] ";
         }
 
 
-        int it = 1;
+        clock_t start_t = clock();
+
+        int it;
         for (it = 1; it <= N_ITERATIONS; ++it) {
 
             //for (int j = 0; j < N_CONCURRENT_SAMPLES; j+=1){//N_CONCURRENT_SAMPLES/10) {
@@ -276,7 +280,7 @@ int main() {
 
             //cout << "min idx: " << min_L_idx << endl;
                
-            X_curr_est = exp(-(long double)it / N_CONCURRENT_SAMPLES);
+            X_curr_est = exp(-(double)it / N_CONCURRENT_SAMPLES);
             w_est = X_prev_est - X_curr_est;
             Z += exp(*min_L_it) * w_est;
 
@@ -296,11 +300,10 @@ int main() {
             mcmc->evolve(current_samples, start_pt_idx, min_L_idx, *min_L_it);
 
 
-            X_prev_est = exp(-(long double)it / N_CONCURRENT_SAMPLES);
+            X_prev_est = exp(-(double)it / N_CONCURRENT_SAMPLES);
 
             //cout << "after..." << current_samples[min_L_idx][0] << ", " << *min_L_it << endl;
             //cout << "-------------------------------" << endl;
-
 
             //cout << "~~~" << endl;
             //mcmc->acceptance_rate();
@@ -320,17 +323,13 @@ int main() {
             }
         }
 
-        if (LOG_PROGRESS) {
-            cout << "Terminated (" << termination_reason << "), logZ: " << log(Z) << endl;
-        }
-
 
         if (USE_REMAINING_SAMPLES) {
             if (LOG_PROGRESS_VERBOSE) {
                 cout << "sorting remaining points..." << endl;
             }
 
-            w_est = (exp(-(long double)(it) / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
+            w_est = (exp(-(double)(it) / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
 
             vector<pair<double, sample_vec>> remaining{};
             remaining.resize(N_CONCURRENT_SAMPLES);
@@ -359,11 +358,14 @@ int main() {
 
 
         sampling_time = (double)(clock() - start_t) / CLOCKS_PER_SEC;
-        long double drawn_logZ_std_dev = compute_logZ_uncertainty(out_samples);
+        double drawn_logZ_std_dev = compute_logZ_uncertainty(out_samples);
+
+        if (LOG_PROGRESS) {
+            cout << "Terminated (" << termination_reason << "), logZ: " << log(Z) << ", time: " << sampling_time << "s" << endl;
+        }
 
         if (LOG_PROGRESS_VERBOSE) {
             cout << "iterations: " << it << endl;
-            cout << "sampling time : " << sampling_time << "s)" << endl;
             cout << "Z: " << Z << endl;
             cout << "logz: " << log(Z) << " +- " << drawn_logZ_std_dev << endl;
         }
