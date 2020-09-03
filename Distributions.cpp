@@ -61,7 +61,13 @@ void intitialise_phase_reconstruction() {
 
     actual_x[0] = cmplx(1, 0);
     for (int i = 1; i < N_FREE_X_CMPTS + 1; ++i) {
-        actual_x[i] = gen_circular_gaussian(); //cmplx(-.4, .8);
+        cmplx val = gen_circular_gaussian(); //cmplx(-.4, .8);
+
+        while (!(is_elem_in_prior_range(val.real())
+            && is_elem_in_prior_range(val.imag()))) {
+            val = gen_circular_gaussian(); //cmplx(-.4, .8);
+        }
+        actual_x[i] = val;
     }
 
     if (LOG_PROGRESS_VERBOSE) {
@@ -108,8 +114,10 @@ double pr_loglike_from_sample(const sample_vec &v_in) {
     return pr_loglike_from_cmplx(sample_to_cmplx(v_in));
 }
 
-
 double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
+    static bool first_call = true;
+    // for ensuring sensible exp() output range...
+    static double adjustment = 1.;
     double summed = 0;
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
         cmplx transformed_cmpt = cmplx(1.,0.) * transform_mat[i][0];
@@ -118,7 +126,14 @@ double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
         }
         summed += (observed_y[i] - abs(transformed_cmpt)) * (observed_y[i] - abs(transformed_cmpt));
     }
-    return -summed;
+
+    if (first_call) {
+        adjustment = summed;
+        first_call = false;
+        //cout << "first call. adjustment = " << adjustment << endl;
+    }
+
+    return -summed/adjustment;
 }
 
 
@@ -201,10 +216,9 @@ sample_vec radially_symmetric_grad_loglike(const sample_vec &p) {
 
 
 //---------------- PRIOR RELATED THINGS -------------------//
-
 double gen_prior_elem() {
     //return std_normal(rand_gen);
-    return 3 * (2 * uniform_01(rand_gen) - 1); //* pow(1./N_SAMPLE_CMPTS, 0.5) ;
+    return PRIOR_RANGE_MAX * (2 * uniform_01(rand_gen) - 1); //* pow(1./N_SAMPLE_CMPTS, 0.5) ;
 }
 
 sample_vec gen_prior() {
@@ -216,7 +230,7 @@ sample_vec gen_prior() {
 }
 
 bool is_elem_in_prior_range(const double &elem) {
-    return (elem > -3 && elem < 3);
+    return (elem > -PRIOR_RANGE_MAX && elem < PRIOR_RANGE_MAX);
 }
 
 bool is_in_prior_range(const sample_vec &sample) {

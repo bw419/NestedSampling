@@ -284,6 +284,8 @@ int main() {
             w_est = X_prev_est - X_curr_est;
             Z += exp(*min_L_it) * w_est;
 
+
+              
             out_samples.push_back(
                 sample_data(
                     current_samples[min_L_idx],
@@ -292,6 +294,9 @@ int main() {
                     mcmc->acceptance_rate_deriv()
                 )
             );
+
+
+
 
             int start_pt_idx = uniform_rand_sample(rand_gen);
 
