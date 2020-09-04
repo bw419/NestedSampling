@@ -16,11 +16,11 @@
 #include <array>
 
 
-#define OUT_PATH "out/samples_93_"
+#define OUT_PATH "out/samples_94_"
 #define LOG_PROGRESS true
 #define LOG_PROGRESS_VERBOSE true
 
-#define FILE_N_START 0
+#define FILE_N_START 2
 #define FILE_N_STOP 3
 #define USE_REMAINING_SAMPLES true
 

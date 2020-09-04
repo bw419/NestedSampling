@@ -30,6 +30,8 @@ double MCMCWalker::calculate_acceptance_rate(bool print_stats) {
     total_successes += curr_walk_successes_;
     total_steps += curr_step_number_+1;
 
+
+
     if (total_steps < N_STEPS_PER_SAMPLE/10) {
         return target_acceptance_rate_;
     }
@@ -54,6 +56,11 @@ double MCMCWalker::calculate_acceptance_rate(bool print_stats) {
         cout << "step size: " << step_size() << endl;
     }
 
+    if (total_steps > N_STEPS_PER_SAMPLE && (acceptance_rate_ < target_acceptance_rate_*.333 || acceptance_rate_ > target_acceptance_rate_ /.333)) {
+        cout << "acceptance rate = " << acceptance_rate_;
+        throw runtime_error("acceptance rate fell outside of acceptable band");
+    }
+
     return acceptance_rate_;
 }
 
@@ -68,29 +75,14 @@ double MCMCWalker::acceptance_rate_deriv() {
 
 bool BallWalkMCMC::step(sample_collection &samples, int idx_to_write, sample_vec &new_pt, double min_loglike, double& new_loglike) {
     double sigma = step_size() * pow(N_SAMPLE_CMPTS, -0.5);
-    if (acceptance_rate() == 0.0) {
-        cout << step_size() << endl;
-    }
     
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
         long double change = std_normal(rand_gen) * sigma;
         long double this_val = samples[idx_to_write][i];
-        if (acceptance_rate() == 0.0) {
-            cout <<  this_val << ", " << change << "---" << endl;
-            cout << (this_val + change) - this_val << endl;
-        }
         new_pt[i] = samples[idx_to_write][i] + change; //2 * uniform_01(rand_gen) - 1;
     }
 
     new_loglike = this->loglike_fn_(new_pt);
-
-    if (acceptance_rate() == 0.0) {
-        for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-            cout << (samples[idx_to_write][i] - new_pt[i]) << "|";
-        }
-        cout << "-->" << min_loglike << endl;
-        cout << "-->" << new_loglike << endl;
-    }
 
 
     if (new_loglike > min_loglike && is_in_prior_range(new_pt)) {
