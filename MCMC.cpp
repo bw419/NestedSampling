@@ -68,12 +68,29 @@ double MCMCWalker::acceptance_rate_deriv() {
 
 bool BallWalkMCMC::step(sample_collection &samples, int idx_to_write, sample_vec &new_pt, double min_loglike, double& new_loglike) {
     double sigma = step_size();// *pow(N_SAMPLE_CMPTS, -0.5);
-
+    if (acceptance_rate() == 0.0) {
+        cout << step_size() << endl;
+    }
+    
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-        new_pt[i] = samples[idx_to_write][i] + std_normal(rand_gen) * sigma; //2 * uniform_01(rand_gen) - 1;
+        double change = std_normal(rand_gen) * sigma;
+        if (acceptance_rate() == 0.0) {
+            //cout << change << "---" << endl;
+            //cout << (samples[idx_to_write][i] + change) - samples[idx_to_write][i] << endl;
+        }
+        new_pt[i] = samples[idx_to_write][i] + change; //2 * uniform_01(rand_gen) - 1;
     }
 
     new_loglike = this->loglike_fn_(new_pt);
+
+    if (acceptance_rate() == 0.0) {
+        for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
+            cout << (samples[idx_to_write][i] - new_pt[i]) << "|";
+        }
+        cout << "-->" << min_loglike << endl;
+        cout << "-->" << new_loglike << endl;
+    }
+
 
     if (new_loglike > min_loglike && is_in_prior_range(new_pt)) {
         return true;
@@ -104,11 +121,11 @@ void BallWalkMCMC::evolve(sample_collection &samples, int idx_to_evolve, int idx
         if (step_success) {
             ++curr_walk_successes_;
 
+
             // move the new point into old_pt as the origin of next ball walk step
             overwrite_sample(samples[idx_to_write], next_pt);
             min_pt_loglike = next_loglike;
         }
-
     }
     n_success_buffer_.push(curr_walk_successes_);
     curr_step_number_ = -1;

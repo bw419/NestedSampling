@@ -133,7 +133,7 @@ double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
         //cout << "first call. adjustment = " << adjustment << endl;
     }
 
-    return -summed/adjustment;
+    return -summed*adjustment;
 }
 
 

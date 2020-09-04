@@ -270,9 +270,10 @@ int main() {
             //cout << "rate, " << mcmc->acceptance_rate() << " | step size, " << mcmc->step_size() << endl;
             //cout << "---------------------------------------------" << endl;
 
-            if (!(it % 500) && LOG_PROGRESS_VERBOSE) {
+            if (!(it % 5000) && LOG_PROGRESS_VERBOSE) {
                 cout << "iteration " << it << ", success rate: " << mcmc->acceptance_rate()
                     << ", step size: " << mcmc->step_size() << ", logz: " << log(Z) << endl;
+
             }
 
             auto min_L_it = min_element(curr_sample_loglikes.begin(), curr_sample_loglikes.end());
@@ -284,8 +285,9 @@ int main() {
             w_est = X_prev_est - X_curr_est;
             Z += exp(*min_L_it) * w_est;
 
-
-              
+            //if (!(it % 100)) {
+                //cout << *min_L_it << ", " << exp(*min_L_it + log(w_est)) << endl;
+            //}
             out_samples.push_back(
                 sample_data(
                     current_samples[min_L_idx],
@@ -314,14 +316,37 @@ int main() {
             //mcmc->acceptance_rate();
             //cout << "~~~" << endl;
 
-            if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
-                termination_reason = "evidence accumulation percentage";
-                break;
+            //if (log(Z) > -100.0) {
+            //    termination_reason = "likelihood threshold";
+            //    break;
+            //}
+            if (!(it % N_CONCURRENT_SAMPLES)) {
+                bool scores_below_thresh = true;
+
+                for (int j = 0; j < N_CONCURRENT_SAMPLES; ++j) {
+                    auto s = sample_to_cmplx(current_samples[j]);
+                    double acc = pow(abs(s[0] - (long double)1.), 2);
+                    for (int k = 0; k < N_FREE_X_CMPTS; ++k) {
+                        acc += pow(abs((s[k + 1] - actual_x[k])), 2);
+                    }
+                    if (sqrt(acc) > 0.1) {
+                        scores_below_thresh = false;
+                    }
+                }
+
+                if (scores_below_thresh) {
+                    termination_reason = "scores below threshold";
+                    break;
+                }
             }
-            if (mcmc->step_size() < TERMINATION_STEPSIZE) {
-                termination_reason = "step size";
-                break;
-            }
+            //if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
+            //    termination_reason = "evidence accumulation percentage";
+            //    break;
+            //}
+            //if (mcmc->step_size() < TERMINATION_STEPSIZE) {
+            //    termination_reason = "step size";
+            //    break;
+            //}
             if (it == N_ITERATIONS - 1) {
                 termination_reason = "max iterations";
                 break;

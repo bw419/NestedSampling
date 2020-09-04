@@ -12,16 +12,6 @@ void overwrite_sample(sample_vec &old_sample, const sample_vec &new_sample) {
 }
 
 
-void print_vec(string name, double* vec, int length) {
-    cout << name << ": ";
-    for (int i = 0; i < length; ++i) {
-        if (i != 0)
-            cout << ", ";
-        cout << vec[i];
-    }
-    cout << endl;
-}
-
 // assume length > 1
 void normalise_vec(sample_vec& vec){
     double norm = get_vec_norm(vec);
