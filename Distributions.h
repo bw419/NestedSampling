@@ -13,6 +13,7 @@ cmplx gen_circular_gaussian();
 extern vector<vector<cmplx>> transform_mat;
 extern cmplx_vec_prepended actual_x;
 extern image_vec observed_y;
+extern double logl_adjustment;
 
 
 

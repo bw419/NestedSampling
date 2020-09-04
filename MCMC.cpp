@@ -67,16 +67,17 @@ double MCMCWalker::acceptance_rate_deriv() {
 
 
 bool BallWalkMCMC::step(sample_collection &samples, int idx_to_write, sample_vec &new_pt, double min_loglike, double& new_loglike) {
-    double sigma = step_size();// *pow(N_SAMPLE_CMPTS, -0.5);
+    double sigma = step_size() * pow(N_SAMPLE_CMPTS, -0.5);
     if (acceptance_rate() == 0.0) {
         cout << step_size() << endl;
     }
     
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
-        double change = std_normal(rand_gen) * sigma;
+        long double change = std_normal(rand_gen) * sigma;
+        long double this_val = samples[idx_to_write][i];
         if (acceptance_rate() == 0.0) {
-            //cout << change << "---" << endl;
-            //cout << (samples[idx_to_write][i] + change) - samples[idx_to_write][i] << endl;
+            cout <<  this_val << ", " << change << "---" << endl;
+            cout << (this_val + change) - this_val << endl;
         }
         new_pt[i] = samples[idx_to_write][i] + change; //2 * uniform_01(rand_gen) - 1;
     }

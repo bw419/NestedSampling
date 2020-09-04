@@ -12,6 +12,7 @@ normal_distribution<double> uniform_circ(0, INV_SQRT_2);
 // prepended with an extra 1 + 0j for a single solution.
 cmplx_vec_prepended actual_x{ };//, { 1, 0 }, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
 image_vec observed_y = { {} };
+double logl_adjustment = 1.;
 
 cmplx gen_circular_gaussian() {
     return { uniform_circ(rand_gen), uniform_circ(rand_gen) };
@@ -117,7 +118,6 @@ double pr_loglike_from_sample(const sample_vec &v_in) {
 double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
     static bool first_call = true;
     // for ensuring sensible exp() output range...
-    static double adjustment = 1.;
     double summed = 0;
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
         cmplx transformed_cmpt = cmplx(1.,0.) * transform_mat[i][0];
@@ -127,13 +127,16 @@ double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
         summed += (observed_y[i] - abs(transformed_cmpt)) * (observed_y[i] - abs(transformed_cmpt));
     }
 
-    if (first_call) {
-        adjustment = summed;
-        first_call = false;
-        //cout << "first call. adjustment = " << adjustment << endl;
+    if (ADJUST_LIKELIHOOD) {
+        if (first_call) {
+            logl_adjustment = 1 / summed;
+            first_call = false;
+            //cout << "first call. adjustment = " << adjustment << endl;
+        }
+        return -summed * logl_adjustment;
     }
 
-    return -summed*adjustment;
+    return -summed;
 }
 
 

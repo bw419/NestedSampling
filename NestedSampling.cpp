@@ -12,13 +12,13 @@ cmplx_vec sample_data::data_cmplx() {
 }
 
 
-vector<double> draw_weight_set(size_t n_samples) {
-    vector<double> weight_set{};
+vector<long double> draw_weight_set(size_t n_samples) {
+    vector<long double> weight_set{};
 
-    double X_i = 1.;
-    double X_prev;
+    long double X_i = 1.;
+    long double X_prev;
 
-    double total = 0;
+    long double total = 0;
 
     for (int i = 0; i < n_samples - N_CONCURRENT_SAMPLES; ++i) {
         X_prev = X_i;
@@ -27,7 +27,7 @@ vector<double> draw_weight_set(size_t n_samples) {
         weight_set.push_back(X_prev - X_i);
     }
 
-    double w_remaining = 0;//X_i / N_CONCURRENT_SAMPLES;
+    long double w_remaining = 0;//X_i / N_CONCURRENT_SAMPLES;
     for (int i = n_samples - N_CONCURRENT_SAMPLES; i < n_samples; ++i) {
         weight_set.push_back(w_remaining);
     }
@@ -42,7 +42,7 @@ bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
 }
 
 void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x, const vector<vector<cmplx>> &transform_mat,
-    const double &logZ, const double &logZ_std_dev,
+    const long double &logZ, const long double &logZ_std_dev,
     const string &termination_reason, const double &sampling_time, const double &neighbour_computing_time) {
     outfile << "actual_x_cmpts=";
     for (int j = 1; j < N_FREE_X_CMPTS + 1; ++j) {
@@ -77,6 +77,7 @@ void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x
     outfile << "logZ=" << logZ << ";";
     outfile << "logZ_std_dev=" << logZ_std_dev << ";";
     outfile << "n_image_cmpts=" << N_IMAGE_CMPTS << ";";
+    outfile << "logl_adjustment_factor=" << logl_adjustment << ";";
     outfile << "sampling_time=" << sampling_time << ";";
     outfile << "neighbour_computing_time=" << neighbour_computing_time << ";";
 }
@@ -116,12 +117,12 @@ void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_sample
 
 double compute_logZ_uncertainty(const vector<sample_data>& out_samples) {
 
-    double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES]{};
-    double acc_drawn_logZ = 0;
+    long double alternative_logZ_vals[N_ALTERNATIVE_WEIGHT_SAMPLES]{};
+    long double acc_drawn_logZ = 0;
 
     for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
-        double drawn_Z = 0;
-        vector<double> drawn_weight_set = draw_weight_set(out_samples.size());
+        long double drawn_Z = 0;
+        vector<long double> drawn_weight_set = draw_weight_set(out_samples.size());
 
 
         for (int j = 0; j < out_samples.size(); ++j) {
@@ -132,10 +133,10 @@ double compute_logZ_uncertainty(const vector<sample_data>& out_samples) {
         acc_drawn_logZ += alternative_logZ_vals[i];
     }
 
-    double drawn_logZ_mean = acc_drawn_logZ / N_ALTERNATIVE_WEIGHT_SAMPLES;
-    double drawn_logZ_variance = 0;
+    long double drawn_logZ_mean = acc_drawn_logZ / N_ALTERNATIVE_WEIGHT_SAMPLES;
+    long double drawn_logZ_variance = 0;
     for (int i = 0; i < N_ALTERNATIVE_WEIGHT_SAMPLES; ++i) {
-        double delta = alternative_logZ_vals[i] - drawn_logZ_mean;
+        long double delta = alternative_logZ_vals[i] - drawn_logZ_mean;
         drawn_logZ_variance += delta * delta;
     }
     drawn_logZ_variance /= (N_ALTERNATIVE_WEIGHT_SAMPLES - 1);
@@ -240,9 +241,9 @@ int main() {
         }
 
 
-        double Z = 0;
-        double X_prev_est = 1;
-        double X_curr_est, w_est;
+        long double Z = 0;
+        long double X_prev_est = 1;
+        long double X_curr_est, w_est;
 
         unique_ptr<MCMCWalker> mcmc;
         if (POLYMORPHIC_MCMC && file_number < POLYMORPHIC_TRANSITION_FILE_N) {
@@ -272,7 +273,7 @@ int main() {
 
             if (!(it % 5000) && LOG_PROGRESS_VERBOSE) {
                 cout << "iteration " << it << ", success rate: " << mcmc->acceptance_rate()
-                    << ", step size: " << mcmc->step_size() << ", logz: " << log(Z) << endl;
+                    << ", step size: " << mcmc->step_size() << ", Z: " << Z << endl;
 
             }
 
@@ -281,12 +282,12 @@ int main() {
 
             //cout << "min idx: " << min_L_idx << endl;
                
-            X_curr_est = exp(-(double)it / N_CONCURRENT_SAMPLES);
+            X_curr_est = exp(-(long double)it / N_CONCURRENT_SAMPLES);
             w_est = X_prev_est - X_curr_est;
             Z += exp(*min_L_it) * w_est;
 
             //if (!(it % 100)) {
-                //cout << *min_L_it << ", " << exp(*min_L_it + log(w_est)) << endl;
+            //    cout << *min_L_it << ", " << exp(*min_L_it + log(w_est)) << endl;
             //}
             out_samples.push_back(
                 sample_data(
@@ -298,8 +299,6 @@ int main() {
             );
 
 
-
-
             int start_pt_idx = uniform_rand_sample(rand_gen);
 
             //cout << "before... " << start_pt_idx << " , " << current_samples[start_pt_idx][0] << ", " << *min_L_it << endl;
@@ -307,7 +306,7 @@ int main() {
             mcmc->evolve(current_samples, start_pt_idx, min_L_idx, *min_L_it);
 
 
-            X_prev_est = exp(-(double)it / N_CONCURRENT_SAMPLES);
+            X_prev_est = exp(-(long double)it / N_CONCURRENT_SAMPLES);
 
             //cout << "after..." << current_samples[min_L_idx][0] << ", " << *min_L_it << endl;
             //cout << "-------------------------------" << endl;
@@ -320,20 +319,27 @@ int main() {
             //    termination_reason = "likelihood threshold";
             //    break;
             //}
-            if (!(it % N_CONCURRENT_SAMPLES)) {
+            if (!(it % (N_CONCURRENT_SAMPLES))) {
                 bool scores_below_thresh = true;
+                //int n_below_thresh = 0;
 
                 for (int j = 0; j < N_CONCURRENT_SAMPLES; ++j) {
                     auto s = sample_to_cmplx(current_samples[j]);
-                    double acc = pow(abs(s[0] - (long double)1.), 2);
+
+                    double acc = 0;
                     for (int k = 0; k < N_FREE_X_CMPTS; ++k) {
-                        acc += pow(abs((s[k + 1] - actual_x[k])), 2);
+                        acc += pow(abs((s[k] - actual_x[k + 1])), 2);
                     }
-                    if (sqrt(acc) > 0.1) {
+                    if (sqrt(acc) > TERMINATION_SCORE) {
                         scores_below_thresh = false;
                     }
+                    //else {
+                    //    ++n_below_thresh;
+                    //}
                 }
-
+                //if (n_below_thresh > 0) {
+                //    cout << "N below: " << n_below_thresh << endl;
+                //}
                 if (scores_below_thresh) {
                     termination_reason = "scores below threshold";
                     break;
@@ -343,10 +349,11 @@ int main() {
             //    termination_reason = "evidence accumulation percentage";
             //    break;
             //}
-            //if (mcmc->step_size() < TERMINATION_STEPSIZE) {
-            //    termination_reason = "step size";
-            //    break;
-            //}
+            if (mcmc->step_size() < TERMINATION_STEPSIZE) {
+                // For numerical stability reasons.
+                termination_reason = "step size";
+                break;
+            }
             if (it == N_ITERATIONS - 1) {
                 termination_reason = "max iterations";
                 break;
@@ -359,9 +366,9 @@ int main() {
                 cout << "sorting remaining points..." << endl;
             }
 
-            w_est = (exp(-(double)(it) / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
+            w_est = (exp(-(long double)(it) / N_CONCURRENT_SAMPLES)) / N_CONCURRENT_SAMPLES;
 
-            vector<pair<double, sample_vec>> remaining{};
+            vector<pair<long double, sample_vec>> remaining{};
             remaining.resize(N_CONCURRENT_SAMPLES);
             for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
                 remaining[i].first = curr_sample_loglikes[i];
@@ -388,7 +395,7 @@ int main() {
 
 
         sampling_time = (double)(clock() - start_t) / CLOCKS_PER_SEC;
-        double drawn_logZ_std_dev = compute_logZ_uncertainty(out_samples);
+        long double drawn_logZ_std_dev = compute_logZ_uncertainty(out_samples);
 
         if (LOG_PROGRESS) {
             cout << "Terminated (" << termination_reason << "), logZ: " << log(Z) << ", time: " << sampling_time << "s" << endl;

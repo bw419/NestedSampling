@@ -6,14 +6,14 @@
 #include "Distributions.h"
 #include "MCMC.h"
 
-vector<double> draw_weight_set(size_t n_samples);
+vector<long double> draw_weight_set(size_t n_samples);
 
 struct sample_data {
 
 	sample_vec data{};
-	double weight;
-	double logv;
-	double logl;
+	long double weight;
+	long double logv;
+	long double logl;
 	double stepsize;
 	double acceptrate;
 	double acceptrate_deriv;
@@ -23,8 +23,8 @@ struct sample_data {
 	sample_data() {
 	}
 
-	sample_data(sample_vec data_in, double logl, double logv, double stepsize, double acceptrate, double acceptrate_deriv) :
-		logl(logl), logv(logv), weight(exp((double)(logl + logv))),
+	sample_data(sample_vec data_in, long double logl, long double logv, double stepsize, double acceptrate, double acceptrate_deriv) :
+		logl(logl), logv(logv), weight(exp((long double)(logl + logv))),
 		stepsize(stepsize), acceptrate(acceptrate),
 		acceptrate_deriv(acceptrate_deriv) {
 		for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
