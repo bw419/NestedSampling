@@ -31,14 +31,15 @@
 #define N_SAMPLE_CMPTS 2*N_FREE_X_CMPTS
 #define N_IMAGE_CMPTS 300
 #define N_STEPS_PER_SAMPLE 50
+
 // Hard cap on number of iterations
 #define N_ITERATIONS 1000000
 #define TERMINATION_PERCENTAGE 1e-10
 // This is the numerical stability limit (x + ~1e-17 = x when x~1)
 #define TERMINATION_STEPSIZE 1e-15
 #define TERMINATION_SCORE .1
-#define N_ALTERNATIVE_WEIGHT_SAMPLES 20
 
+#define N_ALTERNATIVE_WEIGHT_SAMPLES 20
 
 #define COMPUTE_NEIGHBOURS false
 #define N_NEIGHBOURS 10

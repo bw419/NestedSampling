@@ -51,8 +51,8 @@ bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
 }
 
 void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x, const vector<vector<cmplx>> &transform_mat,
-    const long double &logZ, const long double &logZ_std_dev,
-    const string &termination_reason, const double &sampling_time, const double &neighbour_computing_time) {
+    const long double &logZ, const long double &logZ_std_dev, const string& termination_reason,
+    const double &sampling_time, const double &neighbour_computing_time, const int &n_iterations) {
     outfile << "actual_x_cmpts=";
     for (int j = 1; j < N_FREE_X_CMPTS + 1; ++j) {
         outfile << actual_x[j].real() << ",";
@@ -90,6 +90,7 @@ void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x
     outfile << "logl_adjustment_factor=" << logl_adjustment << ";";
     outfile << "sampling_time=" << sampling_time << ";";
     outfile << "neighbour_computing_time=" << neighbour_computing_time << ";";
+    outfile << "n_iterations" << n_iterations << ";";
 }
 
 void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_samples, 
@@ -260,14 +261,14 @@ int main() {
             mcmc = unique_ptr<MCMCWalker>(
                 new GalileanMCMC(.1, loglike_from_sample_vec, grad_loglike_from_sample_vec,
                     N_CONCURRENT_SAMPLES, .5, 0.1, 100, 0.1));
-            cout << "[galilean] " << endl;
+            cout << "[galilean] ";
         }
         else {
             mcmc = unique_ptr<MCMCWalker>(
                 new BallWalkMCMC(.1, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.01, 100));
-            cout << "[ball walk] " << endl;
+            cout << "[ball walk] ";
         }
-
+        cout << "File number: " << file_number << "/" << FILE_N_STOP << endl;
 
         clock_t start_t = clock();
 
@@ -281,8 +282,8 @@ int main() {
             //cout << "rate, " << mcmc->acceptance_rate() << " | step size, " << mcmc->step_size() << endl;
             //cout << "---------------------------------------------" << endl;
 
-            if (!(it % 5000) && LOG_PROGRESS_VERBOSE) {
-                cout << "iteration " << it << ", success rate: " << mcmc->acceptance_rate()
+            if (!(it % 10000) && LOG_PROGRESS_VERBOSE) {
+                cout << "[" << N_FREE_X_CMPTS+1 << "->" << N_IMAGE_CMPTS << "] iteration " << it << ", success rate: " << mcmc->acceptance_rate()
                     << ", step size: " << mcmc->step_size() << ", Z: " << Z;
                 sample_vec mean_sample{};
                 for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
@@ -430,7 +431,7 @@ int main() {
         ofstream outfile;
         outfile.open(OUT_PATH + to_string(file_number) + ".txt");
 
-        write_outfile_header(outfile, actual_x, transform_mat, log(Z), drawn_logZ_std_dev, termination_reason, sampling_time, neighbour_computing_time);
+        write_outfile_header(outfile, actual_x, transform_mat, log(Z), drawn_logZ_std_dev, termination_reason, sampling_time, neighbour_computing_time, it);
         write_outfile_body(outfile, out_samples, min_dists);
 
         outfile.close();
