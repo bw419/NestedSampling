@@ -20,15 +20,14 @@
 #define LOG_PROGRESS true
 #define LOG_PROGRESS_VERBOSE true
 
-#define FILE_N_START 2
-#define FILE_N_STOP 3
+#define FILE_N_START 5
+#define FILE_N_STOP 6
 #define USE_REMAINING_SAMPLES true
 
-#define PRIOR_RANGE_MAX 2
-
+#define PRIOR_RANGE_MAX 3
 
 #define N_CONCURRENT_SAMPLES 300
-#define N_FREE_X_CMPTS 49
+#define N_FREE_X_CMPTS 9
 #define N_SAMPLE_CMPTS 2*N_FREE_X_CMPTS
 #define N_IMAGE_CMPTS 300
 #define N_STEPS_PER_SAMPLE 50

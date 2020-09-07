@@ -37,6 +37,15 @@ vector<long double> draw_weight_set(size_t n_samples) {
 }
 
 
+double get_score(const sample_vec& sample) {
+    auto s = sample_to_cmplx(sample);
+    double acc = 0;
+    for (int k = 0; k < N_FREE_X_CMPTS; ++k) {
+        acc += pow(abs((s[k] - actual_x[k + 1])), 2);
+    }
+    return sqrt(acc);
+}
+
 bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
     return p1.first > p2.first;
 }
@@ -77,6 +86,7 @@ void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x
     outfile << "logZ=" << logZ << ";";
     outfile << "logZ_std_dev=" << logZ_std_dev << ";";
     outfile << "n_image_cmpts=" << N_IMAGE_CMPTS << ";";
+    outfile << "n_concurrent_samples=" << N_CONCURRENT_SAMPLES << ";";
     outfile << "logl_adjustment_factor=" << logl_adjustment << ";";
     outfile << "sampling_time=" << sampling_time << ";";
     outfile << "neighbour_computing_time=" << neighbour_computing_time << ";";
@@ -250,12 +260,12 @@ int main() {
             mcmc = unique_ptr<MCMCWalker>(
                 new GalileanMCMC(.1, loglike_from_sample_vec, grad_loglike_from_sample_vec,
                     N_CONCURRENT_SAMPLES, .5, 0.1, 100, 0.1));
-            cout << "[galilean] ";
+            cout << "[galilean] " << endl;
         }
         else {
             mcmc = unique_ptr<MCMCWalker>(
                 new BallWalkMCMC(.1, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.01, 100));
-            cout << "[ball walk] ";
+            cout << "[ball walk] " << endl;
         }
 
 
@@ -273,8 +283,15 @@ int main() {
 
             if (!(it % 5000) && LOG_PROGRESS_VERBOSE) {
                 cout << "iteration " << it << ", success rate: " << mcmc->acceptance_rate()
-                    << ", step size: " << mcmc->step_size() << ", Z: " << Z << endl;
-
+                    << ", step size: " << mcmc->step_size() << ", Z: " << Z;
+                sample_vec mean_sample{};
+                for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
+                    for (int k = 0; k < N_CONCURRENT_SAMPLES; ++k) {
+                        mean_sample[j] += current_samples[k][j];
+                    }
+                    mean_sample[j] /= N_CONCURRENT_SAMPLES;
+                }
+                cout << ", mean score: " << get_score(mean_sample) << endl;
             }
 
             auto min_L_it = min_element(curr_sample_loglikes.begin(), curr_sample_loglikes.end());
@@ -321,34 +338,20 @@ int main() {
             //}
             if (!(it % (N_CONCURRENT_SAMPLES))) {
                 bool scores_below_thresh = true;
-                //int n_below_thresh = 0;
-
                 for (int j = 0; j < N_CONCURRENT_SAMPLES; ++j) {
-                    auto s = sample_to_cmplx(current_samples[j]);
-
-                    double acc = 0;
-                    for (int k = 0; k < N_FREE_X_CMPTS; ++k) {
-                        acc += pow(abs((s[k] - actual_x[k + 1])), 2);
-                    }
-                    if (sqrt(acc) > TERMINATION_SCORE) {
+                    if (get_score(current_samples[j]) > TERMINATION_SCORE) {
                         scores_below_thresh = false;
                     }
-                    //else {
-                    //    ++n_below_thresh;
-                    //}
                 }
-                //if (n_below_thresh > 0) {
-                //    cout << "N below: " << n_below_thresh << endl;
-                //}
                 if (scores_below_thresh) {
                     termination_reason = "scores below threshold";
                     break;
                 }
             }
-            //if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
-            //    termination_reason = "evidence accumulation percentage";
-            //    break;
-            //}
+            if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
+                termination_reason = "evidence accumulation percentage";
+                break;
+            }
             if (mcmc->step_size() < TERMINATION_STEPSIZE) {
                 // For numerical stability reasons.
                 termination_reason = "step size";
