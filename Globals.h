@@ -27,9 +27,9 @@
 #define PRIOR_RANGE_MAX 3
 
 #define N_CONCURRENT_SAMPLES 500
-#define N_FREE_X_CMPTS 1
-#define N_SAMPLE_CMPTS N_FREE_X_CMPTS
-#define N_IMAGE_CMPTS 50
+#define N_X_CMPTS 32
+#define N_SAMPLE_CMPTS 2*N_X_CMPTS
+#define N_IMAGE_CMPTS 150
 #define N_STEPS_PER_SAMPLE 50
 
 // Hard cap on number of iterations
@@ -54,20 +54,14 @@
 // for numerical reasons
 #define ADJUST_LIKELIHOOD true
 
-#define REAL_VERSION true
-#if REAL_VERSION
-#define N_X_CMPTS N_FREE_X_CMPTS
-#else
-#define N_X_CMPTS N_FREE_X_CMPTS+1
-#endif
+#define REAL_VERSION false
 
 using namespace std;
 typedef complex<long double> cmplx;
 typedef array<long double, N_SAMPLE_CMPTS> sample_vec;
 typedef array<long double, N_IMAGE_CMPTS> image_vec;
 typedef vector<sample_vec> sample_collection;
-typedef array<cmplx, N_FREE_X_CMPTS> cmplx_vec;
-typedef array<cmplx, N_FREE_X_CMPTS + 1> cmplx_vec_prepended;
+typedef array<cmplx, N_X_CMPTS> cmplx_vec;
 
 
 
@@ -82,6 +76,7 @@ typedef array<cmplx, N_FREE_X_CMPTS + 1> cmplx_vec_prepended;
 void overwrite_sample(sample_vec& old_sample, const sample_vec& new_sample);
 void normalise_vec(sample_vec& vec);
 void print_vec(const sample_vec& vec);
+void print_vec(const cmplx_vec& vec);
 double get_vec_norm(const sample_vec& vec);
 
 #endif

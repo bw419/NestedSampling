@@ -12,7 +12,11 @@ void MCMCWalker::adjust_step_size() {
         // -> decrease step rate = initial size * e^(-step constant)
         double rate_error = calculate_acceptance_rate(false) - target_acceptance_rate_;
         double adjust_amount = k_prop_ * rate_error + k_deriv_ * acceptance_rate_deriv_;
-        double thresh = 10;
+        double thresh = 1;
+
+        //cout << step_size() << ", " << calculate_acceptance_rate(false) << ", " << target_acceptance_rate_ << 
+            //", " << rate_error << ", " << adjust_amount << ", " << thresh << endl;
+
         if (abs(adjust_amount) > thresh) {
             //cout << "too much adjustment " << adjust_amount << "  " << adjust_amount / abs(adjust_amount);
             step_constant_ += thresh * adjust_amount/abs(adjust_amount);
@@ -32,9 +36,9 @@ double MCMCWalker::calculate_acceptance_rate(bool print_stats) {
 
 
 
-    if (total_steps < N_STEPS_PER_SAMPLE/10) {
-        return target_acceptance_rate_;
-    }
+    //if (total_steps < N_STEPS_PER_SAMPLE/10) {
+    //    return target_acceptance_rate_;
+    //}
 
     for (int i = 0; i < n_success_buffer_.size(); ++i) {
         total_successes += n_success_buffer_.data[i];
@@ -76,16 +80,23 @@ double MCMCWalker::acceptance_rate_deriv() {
 bool BallWalkMCMC::step(sample_collection &samples, int idx_to_write, sample_vec &new_pt, double min_loglike, double& new_loglike) {
     double sigma = step_size() * pow(N_SAMPLE_CMPTS, -0.5);
     
+    //print_vec(sample_to_cmplx(samples[idx_to_write]));
+
     for (int i = 0; i < N_SAMPLE_CMPTS; ++i) {
         long double change = std_normal(rand_gen) * sigma;
         long double this_val = samples[idx_to_write][i];
         new_pt[i] = samples[idx_to_write][i] + change; //2 * uniform_01(rand_gen) - 1;
     }
 
+    //print_vec(sample_to_cmplx(new_pt));
+
     new_loglike = this->loglike_fn_(new_pt);
 
+    //cout << "(" << calculate_acceptance_rate(false) << " | " << min_loglike << " | " << this->loglike_fn_(samples[idx_to_write]) << " -> " << new_loglike << ")" << endl;
+    //cout << "--------------------------------------------------" << endl;
 
     if (new_loglike > min_loglike && is_in_prior_range(new_pt)) {
+        //cout << "accepted" << endl;
         return true;
     }
     else {

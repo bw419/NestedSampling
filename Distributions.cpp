@@ -12,9 +12,10 @@ normal_distribution<double> uniform_circ(0, INV_SQRT_2);
 
 // prepended with an extra 1 + 0j for a single solution.
 #if REAL_VERSION
-sample_vec actual_x{ };//, { 1, 0 }, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
+sample_vec actual_x{}; //, { 1, 0 }, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
 #else
-cmplx_vec_prepended actual_x{};
+cmplx_vec actual_x{};
+cmplx_vec actual_x_normalised{};
 #endif
 image_vec observed_y = { {} };
 double logl_adjustment = 1.;
@@ -69,14 +70,17 @@ void intitialise_phase_reconstruction() {
         actual_x[i] = val;
     }
 #else
-    actual_x[0] = cmplx(1,0);
-    for (int i = 1; i < N_FREE_X_CMPTS + 1; ++i) {
+    for (int i = 0; i < N_X_CMPTS; ++i) {
         cmplx val = gen_circular_gaussian(); //cmplx(-.4, .8);
         while (!(is_elem_in_prior_range(val.real())
             && is_elem_in_prior_range(val.imag()))) {
             val = gen_circular_gaussian(); //cmplx(-.4, .8);
         }
         actual_x[i] = val;
+    }
+    cmplx inverse_first_phase = abs(actual_x[0]) / actual_x[0];
+    for (int i = 0; i < N_X_CMPTS; ++i) {
+        actual_x_normalised[i] = actual_x[i] * inverse_first_phase;
     }
 #endif
 
@@ -102,9 +106,9 @@ void intitialise_phase_reconstruction() {
 
 cmplx_vec sample_to_cmplx(const sample_vec &in) {
     cmplx_vec out{};
-    for (int i = 0; i < N_FREE_X_CMPTS; ++i) {
+    for (int i = 0; i < N_X_CMPTS; ++i) {
         out[i].real(in[i]);
-        out[i].imag(in[i + N_FREE_X_CMPTS]);
+        out[i].imag(in[i + N_X_CMPTS]);
     }
     return out;
 }
@@ -112,9 +116,9 @@ cmplx_vec sample_to_cmplx(const sample_vec &in) {
 
 sample_vec cmplx_to_sample(const cmplx_vec &in) {
     sample_vec out{};
-    for (int i = 0; i < N_FREE_X_CMPTS; ++i) {
+    for (int i = 0; i < N_X_CMPTS; ++i) {
         out[i] = in[i].real();
-        out[i + N_FREE_X_CMPTS] = in[i].imag();
+        out[i + N_X_CMPTS] = in[i].imag();
     }
     return out;
 }
@@ -127,7 +131,8 @@ double pr_loglike_from_sample(const sample_vec &v_in) {
 #else
     // for ensuring sensible exp() output range...
     
-    //print_vec(v_in);
+    //
+    (v_in);
 
     static bool first_call = true;
     double summed = 0;
@@ -158,15 +163,20 @@ double pr_loglike_from_sample(const sample_vec &v_in) {
 #if !REAL_VERSION
 double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
     // for ensuring sensible exp() output range...
+
+    //print_vec(actual_x);
+    //print_vec(v_in);
+
     static bool first_call = true;
     double summed = 0;
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
-        cmplx transformed_cmpt = cmplx(1.,0.) * transform_mat[i][0];
-        for (int j = 1; j < N_X_CMPTS; ++j) {
-            transformed_cmpt += v_in[j-1] * transform_mat[i][j];
+        cmplx transformed_cmpt = 0;
+        for (int j = 0; j < N_X_CMPTS; ++j) {
+            transformed_cmpt += v_in[j] * transform_mat[i][j];
         }
         summed += (observed_y[i] - abs(transformed_cmpt)) * (observed_y[i] - abs(transformed_cmpt));
     }
+    //cout << "--->" << summed << endl;
 
     if (ADJUST_LIKELIHOOD) {
         if (first_call) {
@@ -197,20 +207,20 @@ sample_vec grad_pr_loglike_from_cmplx(const cmplx_vec &v_in) {
     array<cmplx, N_IMAGE_CMPTS> transformed{};
 
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
-        transformed[i] = cmplx(1., 0.) * transform_mat[i][0];
-        for (int j = 1; j < N_X_CMPTS; ++j) {
-            transformed[i] += v_in[j - 1] * transform_mat[i][j];
+        transformed[i] = 0;
+        for (int j = 0; j < N_X_CMPTS; ++j) {
+            transformed[i] += v_in[j] * transform_mat[i][j];
         }
     }
 
     sample_vec grad{};
-    for (int i = 0; i < N_FREE_X_CMPTS; ++i) {
+    for (int i = 0; i < N_X_CMPTS; ++i) {
         cmplx cmplx_grad_term = 0;
         for (int k = 0; k < N_IMAGE_CMPTS; ++k) {
-            cmplx_grad_term -= (observed_y[k] - abs(transformed[k])) * (conj(transformed[k]) / abs(transformed[k])) * transform_mat[k][i + 1];
+            cmplx_grad_term -= (observed_y[k] - abs(transformed[k])) * (conj(transformed[k]) / abs(transformed[k])) * transform_mat[k][i];
         }
         grad[i] = cmplx_grad_term.real();
-        grad[i + N_FREE_X_CMPTS] = -cmplx_grad_term.imag();
+        grad[i + N_X_CMPTS] = -cmplx_grad_term.imag();
     }
 
     return grad;

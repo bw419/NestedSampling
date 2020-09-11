@@ -5,8 +5,8 @@ using namespace std;
 
 cmplx_vec sample_data::data_cmplx() {
     cmplx_vec data_out{};
-    for (int i = 0; i < N_FREE_X_CMPTS; ++i) {
-        data_out[i] = cmplx(data[i], data[N_FREE_X_CMPTS + i]);
+    for (int i = 0; i < N_X_CMPTS; ++i) {
+        data_out[i] = cmplx(data[i], data[N_X_CMPTS + i]);
     }
     return data_out;
 }
@@ -44,13 +44,50 @@ double get_score(const sample_vec& sample) {
         acc += pow(abs(sample[k]) - abs(actual_x[k]), 2);
     }
 #else
+
     auto s = sample_to_cmplx(sample);
-    for (int k = 0; k < N_FREE_X_CMPTS; ++k) {
-        acc += pow(abs((s[k] - actual_x[k + 1])), 2);
+    cmplx first_cmpt_inv_phase = abs(s[0]) / s[0];//(long double)1. / s[0];
+    for (int k = 0; k < N_X_CMPTS; ++k) {
+        acc += pow(abs(s[k]*first_cmpt_inv_phase - actual_x_normalised[k]), 2);
     }
 #endif
     return sqrt(acc);
 }
+
+
+double get_score_of_mean(const sample_collection& current_samples) {
+    sample_vec mean_sample{};
+    array<double, N_CONCURRENT_SAMPLES> multipliers{};
+
+    for (int k = 0; k < N_CONCURRENT_SAMPLES; ++k) {
+        sample_vec s{};
+
+#if !REAL_VERSION
+        cmplx_vec c_s = sample_to_cmplx(current_samples[k]);
+
+        cmplx first_cmpt_inv_phase = abs(c_s[0]) / c_s[0];
+        for (int j = 0; j < N_X_CMPTS; ++j) {
+            c_s[j] *= first_cmpt_inv_phase;
+        }
+        s = cmplx_to_sample(c_s);
+
+
+#else
+        overwrite_sample(s, current_samples[k]);
+#endif
+
+        for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
+            mean_sample[j] += s[j];
+        }
+    }
+
+    for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
+        mean_sample[j] /= N_CONCURRENT_SAMPLES;
+    }
+    return get_score(mean_sample);
+}
+
+
 
 bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
     return p1.first > p2.first;
@@ -59,7 +96,7 @@ bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
 #if REAL_VERSION
 void write_outfile_header(ofstream &outfile, const sample_vec &actual_x, const vector<vector<cmplx>> &transform_mat,
 #else
-void write_outfile_header(ofstream& outfile, const cmplx_vec_prepended& actual_x, const vector<vector<cmplx>>& transform_mat,
+void write_outfile_header(ofstream& outfile, const cmplx_vec& actual_x, const vector<vector<cmplx>>& transform_mat,
 #endif
     const long double &logZ, const
     long double &logZ_std_dev, const string& termination_reason,
@@ -93,10 +130,10 @@ void write_outfile_header(ofstream& outfile, const cmplx_vec_prepended& actual_x
     }
     outfile << ";";
 #else
-    for (int j = 1; j < N_X_CMPTS; ++j) {
+    for (int j = 0; j < N_X_CMPTS; ++j) {
         outfile << actual_x[j].real() << ",";
     }
-    for (int j = 1; j < N_X_CMPTS; ++j) {
+    for (int j = 0; j < N_X_CMPTS; ++j) {
         outfile << actual_x[j].imag();
         if (j != N_X_CMPTS - 1) {
             outfile << ",";
@@ -322,7 +359,7 @@ int main() {
         }
         else {
             mcmc = unique_ptr<MCMCWalker>(
-                new BallWalkMCMC(.1, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.01, 100));
+                new BallWalkMCMC(.5, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.1, 100));
             cout << "[ball walk] ";
         }
         cout << "File number: " << file_number + 1 << "/" << FILE_N_STOP;
@@ -339,17 +376,9 @@ int main() {
             //cout << "rate, " << mcmc->acceptance_rate() << " | step size, " << mcmc->step_size() << endl;
             //cout << "---------------------------------------------" << endl;
 
-            if (!(it % 10000) && LOG_PROGRESS_VERBOSE) {
-                cout << "[" << N_FREE_X_CMPTS+1 << "->" << N_IMAGE_CMPTS << "] iteration " << it << ", success rate: " << mcmc->acceptance_rate()
-                    << ", step size: " << mcmc->step_size() << ", Z: " << Z;
-                sample_vec mean_sample{};
-                for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
-                    for (int k = 0; k < N_CONCURRENT_SAMPLES; ++k) {
-                        mean_sample[j] += current_samples[k][j];
-                    }
-                    mean_sample[j] /= N_CONCURRENT_SAMPLES;
-                }
-                cout << ", mean score: " << get_score(mean_sample) << endl;
+            if (!(it % 1000) && LOG_PROGRESS_VERBOSE) {
+                cout << "[" << N_X_CMPTS << "->" << N_IMAGE_CMPTS << "] iteration " << it << ", success rate: " << mcmc->acceptance_rate()
+                    << ", step size: " << mcmc->step_size() << ", Z: " << Z << ", mean score: " << get_score_of_mean(current_samples) << endl;
             }
 
             auto min_L_it = min_element(curr_sample_loglikes.begin(), curr_sample_loglikes.end());
@@ -376,18 +405,22 @@ int main() {
 
             int start_pt_idx = uniform_rand_sample(rand_gen);
 
+            //print_vec(cmplx_to_sample(actual_x));
+            //cout << "-------------------------------" << endl;
+            //print_vec(current_samples[min_L_idx]);
             //cout << "before... " << start_pt_idx << " , " << current_samples[start_pt_idx][0] << ", " << *min_L_it << endl;
             //cout << "start idx: " << start_pt_idx << ", min L idx: " << min_L_idx << endl;
+
             mcmc->evolve(current_samples, start_pt_idx, min_L_idx, *min_L_it);
 
-
             X_prev_est = exp(-(long double)it / N_CONCURRENT_SAMPLES);
-
+            
+            //print_vec(current_samples[min_L_idx]);
             //cout << "after..." << current_samples[min_L_idx][0] << ", " << *min_L_it << endl;
             //cout << "-------------------------------" << endl;
 
             //cout << "~~~" << endl;
-            //mcmc->acceptance_rate();
+            //cout << mcmc->acceptance_rate() << endl;
             //cout << "~~~" << endl;
 
             //if (log(Z) > -100.0) {
@@ -395,14 +428,7 @@ int main() {
             //    break;
             //}
             if (!(it % (N_CONCURRENT_SAMPLES))) {
-                sample_vec mean_sample{};
-                for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
-                    for (int k = 0; k < N_CONCURRENT_SAMPLES; ++k) {
-                        mean_sample[j] += current_samples[k][j];
-                    }
-                    mean_sample[j] /= N_CONCURRENT_SAMPLES;
-                }
-                if (get_score(mean_sample) < TERMINATION_SCORE) {
+                if (get_score_of_mean(current_samples) < TERMINATION_SCORE) {
                     //cout << "------------------ scores ------------------" << endl;
                     termination_reason = "mean score below threshold";
                     break;

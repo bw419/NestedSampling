@@ -11,7 +11,7 @@ void overwrite_sample(sample_vec &old_sample, const sample_vec &new_sample) {
 }
 
 
-// assume length > 1
+// assume length >= 1
 void normalise_vec(sample_vec& vec){
     double norm = get_vec_norm(vec);
     for (int i = 0; i < vec.size(); ++i) {
@@ -28,6 +28,18 @@ void print_vec(const sample_vec& vec) {
     }
     cout << endl;
 }
+
+
+void print_vec(const cmplx_vec& vec) {
+    for (int i = 0; i < vec.size(); ++i) {
+        cout << vec[i];
+        if (i != vec.size() - 1) {
+            cout << ", ";
+        }
+    }
+    cout << endl;
+}
+
 
 
 double get_vec_norm(const sample_vec& vec) {

@@ -14,7 +14,8 @@ extern vector<vector<cmplx>> transform_mat;
 #if REAL_VERSION
 extern sample_vec actual_x;
 #else
-extern cmplx_vec_prepended actual_x;
+extern cmplx_vec actual_x;
+extern cmplx_vec actual_x_normalised;
 #endif
 extern image_vec observed_y;
 extern double logl_adjustment;
