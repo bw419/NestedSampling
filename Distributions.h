@@ -11,7 +11,11 @@ extern uniform_int_distribution<int> uniform_rand_sample;
 cmplx gen_circular_gaussian();
 
 extern vector<vector<cmplx>> transform_mat;
+#if REAL_VERSION
+extern sample_vec actual_x;
+#else
 extern cmplx_vec_prepended actual_x;
+#endif
 extern image_vec observed_y;
 extern double logl_adjustment;
 
@@ -25,9 +29,10 @@ cmplx_vec sample_to_cmplx(const sample_vec &in);
 sample_vec cmplx_to_sample(const cmplx_vec &in);
 
 void intitialise_phase_reconstruction();
+double pr_loglike_from_sample(const sample_vec& v_in);
+#if !REAL_VERSION
 double pr_loglike_from_cmplx(const cmplx_vec &v_in);
-double pr_loglike_from_sample(const sample_vec &v_in);
-
+#endif
 sample_vec grad_pr_loglike_from_sample(const sample_vec& v_in);
 sample_vec grad_pr_loglike_from_cmplx(const cmplx_vec& v_in);
 

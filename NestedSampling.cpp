@@ -23,7 +23,7 @@ vector<long double> draw_weight_set(size_t n_samples) {
     for (int i = 0; i < n_samples - N_CONCURRENT_SAMPLES; ++i) {
         X_prev = X_i;
         X_i *= pow(uniform_01(rand_gen), 1./N_CONCURRENT_SAMPLES);
-        total += pow(uniform_01(rand_gen), 1. / N_CONCURRENT_SAMPLES);
+        total += pow(uniform_01(rand_gen), 1./N_CONCURRENT_SAMPLES);
         weight_set.push_back(X_prev - X_i);
     }
 
@@ -38,11 +38,17 @@ vector<long double> draw_weight_set(size_t n_samples) {
 
 
 double get_score(const sample_vec& sample) {
-    auto s = sample_to_cmplx(sample);
     double acc = 0;
+#if REAL_VERSION
+    for (int k = 0; k < N_X_CMPTS; ++k) {
+        acc += pow(abs(sample[k]) - abs(actual_x[k]), 2);
+    }
+#else
+    auto s = sample_to_cmplx(sample);
     for (int k = 0; k < N_FREE_X_CMPTS; ++k) {
         acc += pow(abs((s[k] - actual_x[k + 1])), 2);
     }
+#endif
     return sqrt(acc);
 }
 
@@ -50,39 +56,75 @@ bool dist_cmp(const pair<double, int>& p1, const pair<double, int>& p2) {
     return p1.first > p2.first;
 }
 
-void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x, const vector<vector<cmplx>> &transform_mat,
-    const long double &logZ, const long double &logZ_std_dev, const string& termination_reason,
+#if REAL_VERSION
+void write_outfile_header(ofstream &outfile, const sample_vec &actual_x, const vector<vector<cmplx>> &transform_mat,
+#else
+void write_outfile_header(ofstream& outfile, const cmplx_vec_prepended& actual_x, const vector<vector<cmplx>>& transform_mat,
+#endif
+    const long double &logZ, const
+    long double &logZ_std_dev, const string& termination_reason,
     const double &sampling_time, const double &neighbour_computing_time, const int &n_iterations) {
     outfile << "actual_x_cmpts=";
-    for (int j = 1; j < N_FREE_X_CMPTS + 1; ++j) {
+
+#if REAL_VERSION
+    for (int j = 0; j < N_X_CMPTS; ++j) {
+        outfile << actual_x[j] << ",";
+        if (j != N_X_CMPTS - 1) {
+            outfile << ",";
+        }
+    }
+    outfile << ";matrix_cmpts_real=";
+    for (int j = 0; j < N_IMAGE_CMPTS; ++j) {
+        for (int k = 0; k < N_X_CMPTS; ++k) {
+            outfile << transform_mat[j][k];
+            if (!((j == N_IMAGE_CMPTS - 1) && (k == N_X_CMPTS - 1))) {
+                outfile << ",";
+        }
+    }
+}
+    outfile << ";matrix_cmpts_imag=";
+    for (int j = 0; j < N_IMAGE_CMPTS; ++j) {
+        for (int k = 0; k < N_X_CMPTS + 1; ++k) {
+            outfile << 0.;
+            if (!((j == N_IMAGE_CMPTS - 1) && (k == N_X_CMPTS - 1))) {
+                outfile << ",";
+            }
+        }
+    }
+    outfile << ";";
+#else
+    for (int j = 1; j < N_X_CMPTS; ++j) {
         outfile << actual_x[j].real() << ",";
     }
-    for (int j = 1; j < N_FREE_X_CMPTS + 1; ++j) {
+    for (int j = 1; j < N_X_CMPTS; ++j) {
         outfile << actual_x[j].imag();
-        if (j != N_FREE_X_CMPTS) {
+        if (j != N_X_CMPTS - 1) {
             outfile << ",";
         }
     }
 
+
     outfile << ";matrix_cmpts_real=";
     for (int j = 0; j < N_IMAGE_CMPTS; ++j) {
-        for (int k = 0; k < N_FREE_X_CMPTS + 1; ++k) {
+        for (int k = 0; k < N_X_CMPTS; ++k) {
             outfile << transform_mat[j][k].real();
-            if (!((j == N_IMAGE_CMPTS - 1) && (k == N_FREE_X_CMPTS))) {
+            if (!((j == N_IMAGE_CMPTS - 1) && (k == N_X_CMPTS - 1))) {
                 outfile << ",";
             }
         }
     }
     outfile << ";matrix_cmpts_imag=";
     for (int j = 0; j < N_IMAGE_CMPTS; ++j) {
-        for (int k = 0; k < N_FREE_X_CMPTS + 1; ++k) {
+        for (int k = 0; k < N_X_CMPTS + 1; ++k) {
             outfile << transform_mat[j][k].imag();
-            if (!((j == N_IMAGE_CMPTS - 1) && (k == N_FREE_X_CMPTS))) {
+            if (!((j == N_IMAGE_CMPTS - 1) && (k == N_X_CMPTS - 1))) {
                 outfile << ",";
             }
         }
     }
     outfile << ";";
+#endif
+
     outfile << "logZ=" << logZ << ";";
     outfile << "logZ_std_dev=" << logZ_std_dev << ";";
     outfile << "n_image_cmpts=" << N_IMAGE_CMPTS << ";";
@@ -90,7 +132,7 @@ void write_outfile_header(ofstream &outfile, const cmplx_vec_prepended &actual_x
     outfile << "logl_adjustment_factor=" << logl_adjustment << ";";
     outfile << "sampling_time=" << sampling_time << ";";
     outfile << "neighbour_computing_time=" << neighbour_computing_time << ";";
-    outfile << "n_iterations" << n_iterations << ";";
+    outfile << "n_iterations=" << n_iterations << ";";
 }
 
 void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_samples, 
@@ -105,9 +147,16 @@ void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_sample
         }
     }
 
-    outfile << "logl,logv,weight,stepsize,acceptrate,acceptrate_deriv" << endl;
+    outfile << "logl,logv,";
+    if (OUTPUT_LOG_WEIGHTS) {
+        outfile << "logw,";
+    }
+    else {
+        outfile << "weight,";
+    }
+    outfile << "stepsize,acceptrate,acceptrate_deriv" << endl;
 
-    outfile << scientific << setprecision(10);
+    outfile << scientific << setprecision(14); // any more precise than this and numerical stability becomes an issue
 
     for (int i = 0; i < out_samples.size(); ++i) {
         for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
@@ -118,8 +167,17 @@ void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_sample
                 outfile << min_dists[i][j] << ",";
             }
         }
-        outfile << out_samples[i].logl << "," << out_samples[i].logv << "," << out_samples[i].weight
-            << "," << out_samples[i].stepsize << "," << out_samples[i].acceptrate
+        outfile << out_samples[i].logl << "," << out_samples[i].logv << ",";
+            
+        if (OUTPUT_LOG_WEIGHTS) {
+            outfile << log(out_samples[i].weight);
+        }
+        else {
+            outfile << out_samples[i].weight;
+        }
+
+
+        outfile << "," << out_samples[i].stepsize << "," << out_samples[i].acceptrate
             << "," << out_samples[i].acceptrate_deriv << endl;
     }
 
@@ -226,7 +284,6 @@ vector<vector<int>> min_dists{};
 
 
 int main() {
-    
     current_samples.resize(N_CONCURRENT_SAMPLES);
     curr_sample_loglikes.resize(N_CONCURRENT_SAMPLES);
     out_samples.reserve(N_ITERATIONS + N_CONCURRENT_SAMPLES);
@@ -268,8 +325,8 @@ int main() {
                 new BallWalkMCMC(.1, loglike_from_sample_vec, N_CONCURRENT_SAMPLES, .5, 0.01, 100));
             cout << "[ball walk] ";
         }
-        cout << "File number: " << file_number << "/" << FILE_N_STOP << endl;
-
+        cout << "File number: " << file_number + 1 << "/" << FILE_N_STOP;
+        cout << ", Max iterations: " << N_ITERATIONS << endl;
         clock_t start_t = clock();
 
         int it;
@@ -338,27 +395,32 @@ int main() {
             //    break;
             //}
             if (!(it % (N_CONCURRENT_SAMPLES))) {
-                bool scores_below_thresh = true;
-                for (int j = 0; j < N_CONCURRENT_SAMPLES; ++j) {
-                    if (get_score(current_samples[j]) > TERMINATION_SCORE) {
-                        scores_below_thresh = false;
+                sample_vec mean_sample{};
+                for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
+                    for (int k = 0; k < N_CONCURRENT_SAMPLES; ++k) {
+                        mean_sample[j] += current_samples[k][j];
                     }
+                    mean_sample[j] /= N_CONCURRENT_SAMPLES;
                 }
-                if (scores_below_thresh) {
-                    termination_reason = "scores below threshold";
+                if (get_score(mean_sample) < TERMINATION_SCORE) {
+                    //cout << "------------------ scores ------------------" << endl;
+                    termination_reason = "mean score below threshold";
                     break;
                 }
             }
             if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
+                //cout << "------------------ evidence ------------------" << endl;
                 termination_reason = "evidence accumulation percentage";
                 break;
             }
             if (mcmc->step_size() < TERMINATION_STEPSIZE) {
                 // For numerical stability reasons.
+                //cout << "------------------ step size ------------------" << endl;
                 termination_reason = "step size";
                 break;
             }
             if (it == N_ITERATIONS - 1) {
+                //cout << "------------------ max its ------------------" << endl;
                 termination_reason = "max iterations";
                 break;
             }
@@ -424,12 +486,13 @@ int main() {
         }
 
 
-        if (LOG_PROGRESS_VERBOSE) {
-            cout << "writing to file..." << endl;
-        }
-
         ofstream outfile;
-        outfile.open(OUT_PATH + to_string(file_number) + ".txt");
+        string f_name = OUT_PATH + to_string(file_number) + ".txt";
+        outfile.open(f_name);
+
+        if (LOG_PROGRESS_VERBOSE) {
+            cout << "writing to file \"" << f_name << "\"" << endl;
+        }
 
         write_outfile_header(outfile, actual_x, transform_mat, log(Z), drawn_logZ_std_dev, termination_reason, sampling_time, neighbour_computing_time, it);
         write_outfile_body(outfile, out_samples, min_dists);

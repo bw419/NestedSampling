@@ -9,8 +9,13 @@ uniform_real_distribution<double> uniform_01(0, 1);
 uniform_int_distribution<int> uniform_rand_sample(0, N_CONCURRENT_SAMPLES - 1);
 normal_distribution<double> uniform_circ(0, INV_SQRT_2);
 
+
 // prepended with an extra 1 + 0j for a single solution.
-cmplx_vec_prepended actual_x{ };//, { 1, 0 }, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
+#if REAL_VERSION
+sample_vec actual_x{ };//, { 1, 0 }, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
+#else
+cmplx_vec_prepended actual_x{};
+#endif
 image_vec observed_y = { {} };
 double logl_adjustment = 1.;
 
@@ -31,49 +36,54 @@ sample_vec grad_loglike_from_sample_vec(const sample_vec& p) {
     return grad_pr_loglike_from_sample(p);
 }
 
-
 vector<vector<cmplx>> transform_mat{};
 void intitialise_phase_reconstruction() {
     cout << scientific << setprecision(2);
     transform_mat.resize(N_IMAGE_CMPTS);
 
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
-        transform_mat[i].resize(N_FREE_X_CMPTS + 1);
-
-        for (int j = 0; j < N_FREE_X_CMPTS + 1; ++j) {
-            if (i < N_FREE_X_CMPTS + 1) {
-                if (i == j) {
-                    transform_mat[i][i] = 1;
-                }
-            }
-            else {
-                transform_mat[i][j] = gen_circular_gaussian();
-            }
+        transform_mat[i].resize(N_X_CMPTS);
+        for (int j = 0; j < N_X_CMPTS; ++j) {
+        #if REAL_VERSION
+            transform_mat[i][j] = std_normal(rand_gen);
+        #else
+            transform_mat[i][j] = gen_circular_gaussian();
+        #endif
         }
     }
 
-
     //for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
-    //    for (int j = 0; j < N_X_CMPTS + 1; ++j) {
-    //        cout << transform_mat[i * (N_X_CMPTS + 1) + j] << " | ";
+    //    for (int j = 0; j < N_X_CMPTS; ++j) {
+    //        cout << transform_mat[i * N_X_CMPTS + j] << " | ";
     //    }
     //    cout << endl;
     //}
 
-    actual_x[0] = cmplx(1, 0);
+
+#if REAL_VERSION
+    for (int i = 0; i <N_X_CMPTS; ++i) {
+        double val = std_normal(rand_gen); //cmplx(-.4, .8);
+        while (!(is_elem_in_prior_range(val))) {
+            val = std_normal(rand_gen); //cmplx(-.4, .8);
+        }
+        actual_x[i] = val;
+    }
+#else
+    actual_x[0] = cmplx(1,0);
     for (int i = 1; i < N_FREE_X_CMPTS + 1; ++i) {
         cmplx val = gen_circular_gaussian(); //cmplx(-.4, .8);
-
         while (!(is_elem_in_prior_range(val.real())
             && is_elem_in_prior_range(val.imag()))) {
             val = gen_circular_gaussian(); //cmplx(-.4, .8);
         }
         actual_x[i] = val;
     }
+#endif
+
 
     if (LOG_PROGRESS_VERBOSE) {
-        cout << "actual x: " << cmplx(1, 0) << " | ";
-        for (int i = 1; i < N_FREE_X_CMPTS + 1; ++i) {
+        cout << "actual x: ";
+        for (int i = 0; i < N_X_CMPTS; ++i) {
             cout << actual_x[i] << " | ";
         }
         cout << endl;
@@ -82,7 +92,7 @@ void intitialise_phase_reconstruction() {
 
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
         cmplx sum = 0;
-        for (int j = 0; j < N_FREE_X_CMPTS + 1; ++j) {
+        for (int j = 0; j < N_X_CMPTS; ++j) {
             sum += actual_x[j] * transform_mat[i][j];
         }
         observed_y[i] = abs(sum);
@@ -112,16 +122,47 @@ sample_vec cmplx_to_sample(const cmplx_vec &in) {
 
 // Nested function calls should be optimised away.
 double pr_loglike_from_sample(const sample_vec &v_in) {
+#if !REAL_VERSION
     return pr_loglike_from_cmplx(sample_to_cmplx(v_in));
+#else
+    // for ensuring sensible exp() output range...
+    
+    //print_vec(v_in);
+
+    static bool first_call = true;
+    double summed = 0;
+    for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
+        double transformed_cmpt = 0;
+        for (int j = 0; j < N_X_CMPTS; ++j) {
+            transformed_cmpt += v_in[j] * transform_mat[i][j].real();
+        }
+        summed += (observed_y[i] - abs(transformed_cmpt)) * (observed_y[i] - abs(transformed_cmpt));
+    }
+
+    //cout << "-------------->" << -summed << endl;
+
+    if (ADJUST_LIKELIHOOD) {
+        if (first_call) {
+            logl_adjustment = 1 / summed;
+            first_call = false;
+            //cout << "first call. adjustment = " << adjustment << endl;
+        }
+        return -summed * logl_adjustment;
+    }
+
+
+    return -summed;
+#endif
 }
 
+#if !REAL_VERSION
 double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
-    static bool first_call = true;
     // for ensuring sensible exp() output range...
+    static bool first_call = true;
     double summed = 0;
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
         cmplx transformed_cmpt = cmplx(1.,0.) * transform_mat[i][0];
-        for (int j = 1; j < N_FREE_X_CMPTS + 1; ++j) {
+        for (int j = 1; j < N_X_CMPTS; ++j) {
             transformed_cmpt += v_in[j-1] * transform_mat[i][j];
         }
         summed += (observed_y[i] - abs(transformed_cmpt)) * (observed_y[i] - abs(transformed_cmpt));
@@ -138,11 +179,16 @@ double pr_loglike_from_cmplx(const cmplx_vec &v_in) {
 
     return -summed;
 }
+#endif
 
 
 // Nested function calls should be optimised away.
 sample_vec grad_pr_loglike_from_sample(const sample_vec &v_in) {
+#if !REAL_VERSION
     return grad_pr_loglike_from_cmplx(sample_to_cmplx(v_in));
+#else
+    return {};
+#endif
 }
 
 
@@ -152,7 +198,7 @@ sample_vec grad_pr_loglike_from_cmplx(const cmplx_vec &v_in) {
 
     for (int i = 0; i < N_IMAGE_CMPTS; ++i) {
         transformed[i] = cmplx(1., 0.) * transform_mat[i][0];
-        for (int j = 1; j < N_FREE_X_CMPTS + 1; ++j) {
+        for (int j = 1; j < N_X_CMPTS; ++j) {
             transformed[i] += v_in[j - 1] * transform_mat[i][j];
         }
     }
@@ -169,7 +215,6 @@ sample_vec grad_pr_loglike_from_cmplx(const cmplx_vec &v_in) {
 
     return grad;
 }
-
 
 
 double single_gaussian_loglike_from_sample(const sample_vec &p) {
