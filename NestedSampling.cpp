@@ -101,11 +101,11 @@ void write_outfile_header(ofstream& outfile, const cmplx_vec& actual_x, const ve
     const long double &logZ, const
     long double &logZ_std_dev, const string& termination_reason,
     const double &sampling_time, const double &neighbour_computing_time, const int &n_iterations) {
-    outfile << "actual_x_cmpts=";
 
 #if REAL_VERSION
+    outfile << "actual_x_cmpts=";
     for (int j = 0; j < N_X_CMPTS; ++j) {
-        outfile << actual_x[j] << ",";
+        outfile << actual_x[j];
         if (j != N_X_CMPTS - 1) {
             outfile << ",";
         }
@@ -128,8 +128,9 @@ void write_outfile_header(ofstream& outfile, const cmplx_vec& actual_x, const ve
             }
         }
     }
-    outfile << ";";
+    outfile << ";real=1;";
 #else
+    outfile << "actual_x_cmpts=";
     for (int j = 0; j < N_X_CMPTS; ++j) {
         outfile << actual_x[j].real() << ",";
     }
@@ -159,7 +160,8 @@ void write_outfile_header(ofstream& outfile, const cmplx_vec& actual_x, const ve
             }
         }
     }
-    outfile << ";";
+    outfile << ";real=0;";
+
 #endif
 
     outfile << "logZ=" << logZ << ";";
@@ -170,6 +172,7 @@ void write_outfile_header(ofstream& outfile, const cmplx_vec& actual_x, const ve
     outfile << "sampling_time=" << sampling_time << ";";
     outfile << "neighbour_computing_time=" << neighbour_computing_time << ";";
     outfile << "n_iterations=" << n_iterations << ";";
+    outfile << "termination_reason=" << termination_reason << ";";
 }
 
 void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_samples, 
@@ -376,7 +379,7 @@ int main() {
             //cout << "rate, " << mcmc->acceptance_rate() << " | step size, " << mcmc->step_size() << endl;
             //cout << "---------------------------------------------" << endl;
 
-            if (!(it % 1000) && LOG_PROGRESS_VERBOSE) {
+            if (!(it % 10000) && LOG_PROGRESS_VERBOSE) {
                 cout << "[" << N_X_CMPTS << "->" << N_IMAGE_CMPTS << "] iteration " << it << ", success rate: " << mcmc->acceptance_rate()
                     << ", step size: " << mcmc->step_size() << ", Z: " << Z << ", mean score: " << get_score_of_mean(current_samples) << endl;
             }

@@ -16,7 +16,7 @@
 #include <array>
 
 
-#define OUT_PATH "out/test/samples_10_"
+#define OUT_PATH "out/samples_10_"
 #define LOG_PROGRESS true
 #define LOG_PROGRESS_VERBOSE true
 
@@ -27,9 +27,8 @@
 #define PRIOR_RANGE_MAX 3
 
 #define N_CONCURRENT_SAMPLES 500
-#define N_X_CMPTS 32
-#define N_SAMPLE_CMPTS 2*N_X_CMPTS
-#define N_IMAGE_CMPTS 150
+#define N_X_CMPTS 4
+#define N_IMAGE_CMPTS 24
 #define N_STEPS_PER_SAMPLE 50
 
 // Hard cap on number of iterations
@@ -45,7 +44,7 @@
 #define N_NEIGHBOURS 10
 
 // causes python parse errors if not log
-#define OUTPUT_LOG_WEIGHTS false
+#define OUTPUT_LOG_WEIGHTS true
 
 // switch between Ball Walk and Galilean
 #define POLYMORPHIC_MCMC false
@@ -54,7 +53,13 @@
 // for numerical reasons
 #define ADJUST_LIKELIHOOD true
 
-#define REAL_VERSION false
+#define REAL_VERSION true
+#if REAL_VERSION
+#define N_SAMPLE_CMPTS N_X_CMPTS
+#else
+#define N_SAMPLE_CMPTS 2*N_X_CMPTS
+#endif
+
 
 using namespace std;
 typedef complex<long double> cmplx;
