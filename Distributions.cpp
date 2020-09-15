@@ -2,8 +2,7 @@
 
 using namespace std;
 
-
-default_random_engine rand_gen(time(0));
+default_random_engine rand_gen(std::chrono::system_clock::now().time_since_epoch().count());
 normal_distribution<double> std_normal(0, 1);
 uniform_real_distribution<double> uniform_01(0, 1);
 uniform_int_distribution<int> uniform_rand_sample(0, N_CONCURRENT_SAMPLES - 1);
@@ -13,6 +12,7 @@ normal_distribution<double> uniform_circ(0, INV_SQRT_2);
 // prepended with an extra 1 + 0j for a single solution.
 #if REAL_VERSION
 sample_vec actual_x{}; //, { 1, 0 }, { 0, 1 }, { .4, .7 }, { -.1, -.9 }, { .4, -.5 }, { 1, -1 } };//{ 1, .5, -.1, .4 };
+sample_vec actual_x_normalised{};
 #else
 cmplx_vec actual_x{};
 cmplx_vec actual_x_normalised{};
@@ -68,6 +68,10 @@ void intitialise_phase_reconstruction() {
             val = std_normal(rand_gen); //cmplx(-.4, .8);
         }
         actual_x[i] = val;
+    }
+    double sign = actual_x[0] / abs(actual_x[0]);
+    for (int i = 0; i < N_X_CMPTS; ++i) {
+        actual_x_normalised[i] = actual_x[i] * sign;
     }
 #else
     for (int i = 0; i < N_X_CMPTS; ++i) {

@@ -2,6 +2,7 @@
 #define DISTRIBUTIONS_H
 
 #include "Globals.h"
+#include <chrono>
 
 extern default_random_engine rand_gen;
 extern normal_distribution<double> std_normal;
@@ -13,6 +14,7 @@ cmplx gen_circular_gaussian();
 extern vector<vector<cmplx>> transform_mat;
 #if REAL_VERSION
 extern sample_vec actual_x;
+extern sample_vec actual_x_normalised;
 #else
 extern cmplx_vec actual_x;
 extern cmplx_vec actual_x_normalised;

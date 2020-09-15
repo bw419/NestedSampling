@@ -62,7 +62,12 @@ double get_score_of_mean(const sample_collection& current_samples) {
     for (int k = 0; k < N_CONCURRENT_SAMPLES; ++k) {
         sample_vec s{};
 
-#if !REAL_VERSION
+#if REAL_VERSION
+        double first_cmpt_sign = current_samples[k][0]/abs(current_samples[k][0]);
+        for (int j = 0; j < N_X_CMPTS; ++j) {
+            s[j] = first_cmpt_sign * current_samples[k][j];
+        }
+#else
         cmplx_vec c_s = sample_to_cmplx(current_samples[k]);
 
         cmplx first_cmpt_inv_phase = abs(c_s[0]) / c_s[0];
@@ -71,9 +76,7 @@ double get_score_of_mean(const sample_collection& current_samples) {
         }
         s = cmplx_to_sample(c_s);
 
-
-#else
-        overwrite_sample(s, current_samples[k]);
+        //overwrite_sample(s, current_samples[k]);
 #endif
 
         for (int j = 0; j < N_SAMPLE_CMPTS; ++j) {
@@ -105,7 +108,7 @@ void write_outfile_header(ofstream& outfile, const cmplx_vec& actual_x, const ve
 #if REAL_VERSION
     outfile << "actual_x_cmpts=";
     for (int j = 0; j < N_X_CMPTS; ++j) {
-        outfile << actual_x[j];
+        outfile << actual_x_normalised[j];
         if (j != N_X_CMPTS - 1) {
             outfile << ",";
         }
@@ -128,14 +131,14 @@ void write_outfile_header(ofstream& outfile, const cmplx_vec& actual_x, const ve
             }
         }
     }
-    outfile << ";real=1;";
+    outfile << ";real=True;";
 #else
     outfile << "actual_x_cmpts=";
     for (int j = 0; j < N_X_CMPTS; ++j) {
-        outfile << actual_x[j].real() << ",";
+        outfile << actual_x_normalised[j].real() << ",";
     }
     for (int j = 0; j < N_X_CMPTS; ++j) {
-        outfile << actual_x[j].imag();
+        outfile << actual_x_normalised[j].imag();
         if (j != N_X_CMPTS - 1) {
             outfile << ",";
         }
@@ -160,7 +163,7 @@ void write_outfile_header(ofstream& outfile, const cmplx_vec& actual_x, const ve
             }
         }
     }
-    outfile << ";real=0;";
+    outfile << ";real=False;";
 
 #endif
 
@@ -194,7 +197,7 @@ void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_sample
     else {
         outfile << "weight,";
     }
-    outfile << "stepsize,acceptrate,acceptrate_deriv" << endl;
+    outfile << "scores,stepsize,acceptrate,acceptrate_deriv" << endl;
 
     outfile << scientific << setprecision(14); // any more precise than this and numerical stability becomes an issue
 
@@ -217,7 +220,7 @@ void write_outfile_body(ofstream& outfile, const vector<sample_data> &out_sample
         }
 
 
-        outfile << "," << out_samples[i].stepsize << "," << out_samples[i].acceptrate
+        outfile << "," << out_samples[i].score << "," << out_samples[i].stepsize << "," << out_samples[i].acceptrate
             << "," << out_samples[i].acceptrate_deriv << endl;
     }
 
@@ -340,7 +343,7 @@ int main() {
         string termination_reason;
         double sampling_time;
         double neighbour_computing_time;
-
+        int n_its_below_minscore = 0;
 
         // generate initial points
         for (int i = 0; i < N_CONCURRENT_SAMPLES; ++i) {
@@ -398,8 +401,8 @@ int main() {
             //}
             out_samples.push_back(
                 sample_data(
-                    current_samples[min_L_idx],
-                    *min_L_it, log(w_est),
+                    current_samples[min_L_idx], 
+                    *min_L_it, log(w_est), get_score(current_samples[min_L_idx]),
                     mcmc->step_size(), mcmc->acceptance_rate(),
                     mcmc->acceptance_rate_deriv()
                 )
@@ -430,11 +433,17 @@ int main() {
             //    termination_reason = "likelihood threshold";
             //    break;
             //}
-            if (!(it % (N_CONCURRENT_SAMPLES))) {
+            if (!(it % (N_CONCURRENT_SAMPLES)) || n_its_below_minscore != 0) {
                 if (get_score_of_mean(current_samples) < TERMINATION_SCORE) {
-                    //cout << "------------------ scores ------------------" << endl;
-                    termination_reason = "mean score below threshold";
-                    break;
+                    n_its_below_minscore++;
+                    if (n_its_below_minscore > N_CONCURRENT_SAMPLES * 5) {
+                        //cout << "------------------ scores ------------------" << endl;
+                        termination_reason = "mean score below threshold";
+                        break;
+                    }
+                }
+                else {
+                    n_its_below_minscore = 0;
                 }
             }
             if (exp(*min_L_it) * X_curr_est < TERMINATION_PERCENTAGE * Z) {
@@ -479,7 +488,7 @@ int main() {
                 out_samples.push_back(
                     sample_data(
                         remaining[i].second,
-                        remaining[i].first, log(w_est),
+                        remaining[i].first, log(w_est), get_score(remaining[i].second),
                         mcmc->step_size(), mcmc->acceptance_rate(),
                         mcmc->acceptance_rate_deriv()
                     )
